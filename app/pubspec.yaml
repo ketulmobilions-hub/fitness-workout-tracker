@@ -1,0 +1,54 @@
+name: fitness_workout_tracker
+description: "Fitness & workout tracker app with custom plans, exercise logging, and progress tracking."
+publish_to: 'none'
+version: '0.1.0+1'
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^3.1.0
+  riverpod_annotation: ^4.0.0
+
+  # Data Classes
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.9.0
+
+  # Navigation
+  go_router: ^17.1.0
+
+  # HTTP
+  dio: ^5.9.2
+  retrofit: ^4.9.2
+
+  # Local packages
+  fitness_data:
+    path: packages/fitness_data
+  fitness_domain:
+    path: packages/fitness_domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Code Generation
+  build_runner: ^2.12.2
+  riverpod_generator: ^4.0.0
+  freezed: ^3.2.3
+  json_serializable: ^6.11.2
+  retrofit_generator: ^10.2.1
+
+  # Linting
+  custom_lint: ^0.8.1
+  riverpod_lint: ^3.1.0
+
+  # Testing
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
