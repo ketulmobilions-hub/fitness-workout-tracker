@@ -147,6 +147,8 @@ main ← dev ← feature/*
 3. **Merge feature → dev** when the feature is complete
 4. **Merge dev → main** only when an entire phase is complete (Phase 1, Phase 2, Phase 3)
 5. **Never merge feature branches directly into main**
+6. **When starting a new issue**, move its corresponding GitHub Project card to **"In Progress"**
+7. **When completing an issue**, move its corresponding GitHub Project card to **"Done"**
 
 ## API Conventions
 
