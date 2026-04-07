@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh label:*)",
+      "Bash(read table:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)",
+      "Bash(gh issue:*)",
+      "Bash(git pull:*)",
+      "Bash(flutter pub:*)",
+      "Bash(dart run:*)",
+      "Bash(flutter test:*)",
+      "Bash(grep:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(git add:*)",
+      "Bash(gh project:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo:*)",
+      "Bash(gh auth:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('login'\\), d.get\\('name'\\)\\)\")",
+      "Bash(git push:*)"
+    ]
+  }
+}
