@@ -1,0 +1,318 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum AuthProvider {
+  email
+  google
+  apple
+  guest
+}
+
+enum ExerciseType {
+  strength
+  cardio
+  stretching
+}
+
+enum ScheduleType {
+  weekly
+  recurring
+}
+
+enum SessionStatus {
+  in_progress
+  completed
+  abandoned
+}
+
+enum RecordType {
+  max_weight
+  max_reps
+  max_volume
+  best_pace
+}
+
+enum StreakStatus {
+  completed
+  rest_day
+  missed
+}
+
+enum SyncOperation {
+  create
+  update
+  delete
+}
+
+// ─── Users & Auth ────────────────────────────────────────
+
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String?      @unique
+  passwordHash String?      @map("password_hash")
+  displayName  String?      @map("display_name")
+  avatarUrl    String?      @map("avatar_url")
+  authProvider AuthProvider @default(email) @map("auth_provider")
+  isGuest      Boolean      @default(false) @map("is_guest")
+  preferences  Json?        @default("{}")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  exercises       Exercise[]
+  workoutPlans    WorkoutPlan[]
+  workoutSessions WorkoutSession[]
+  personalRecords PersonalRecord[]
+  streak          Streak?
+  streakHistory   StreakHistory[]
+  syncQueue       SyncQueue[]
+
+  @@map("users")
+}
+
+// ─── Exercise Library ────────────────────────────────────
+
+model MuscleGroup {
+  id          String @id @default(uuid()) @db.Uuid
+  name        String @unique
+  displayName String @map("display_name")
+  bodyRegion  String @map("body_region")
+
+  exercises ExerciseMuscleGroup[]
+
+  @@map("muscle_groups")
+}
+
+model Exercise {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  exerciseType ExerciseType @map("exercise_type")
+  instructions String?      @db.Text
+  mediaUrl     String?      @map("media_url")
+  createdBy    String?      @map("created_by") @db.Uuid
+  isCustom     Boolean      @default(false) @map("is_custom")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  creator          User?                 @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  muscleGroups     ExerciseMuscleGroup[]
+  planDayExercises PlanDayExercise[]
+  exerciseLogs     ExerciseLog[]
+  personalRecords  PersonalRecord[]
+
+  @@index([exerciseType])
+  @@index([createdBy])
+  @@map("exercises")
+}
+
+model ExerciseMuscleGroup {
+  exerciseId    String  @map("exercise_id") @db.Uuid
+  muscleGroupId String  @map("muscle_group_id") @db.Uuid
+  isPrimary     Boolean @default(false) @map("is_primary")
+
+  exercise    Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscleGroup MuscleGroup @relation(fields: [muscleGroupId], references: [id], onDelete: Cascade)
+
+  @@id([exerciseId, muscleGroupId])
+  @@map("exercise_muscle_groups")
+}
+
+// ─── Workout Plans ───────────────────────────────────────
+
+model WorkoutPlan {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  name         String
+  description  String?
+  isActive     Boolean      @default(false) @map("is_active")
+  scheduleType ScheduleType @default(weekly) @map("schedule_type")
+  weeksCount   Int?         @map("weeks_count")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planDays PlanDay[]
+  sessions WorkoutSession[]
+
+  @@index([userId])
+  @@map("workout_plans")
+}
+
+model PlanDay {
+  id         String  @id @default(uuid()) @db.Uuid
+  planId     String  @map("plan_id") @db.Uuid
+  dayOfWeek  Int     @map("day_of_week")
+  weekNumber Int?    @map("week_number")
+  name       String?
+  sortOrder  Int      @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  plan      WorkoutPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercises PlanDayExercise[]
+  sessions  WorkoutSession[]
+
+  @@index([planId])
+  @@map("plan_days")
+}
+
+model PlanDayExercise {
+  id                String  @id @default(uuid()) @db.Uuid
+  planDayId         String  @map("plan_day_id") @db.Uuid
+  exerciseId        String  @map("exercise_id") @db.Uuid
+  sortOrder         Int     @map("sort_order")
+  targetSets        Int?    @map("target_sets")
+  targetReps        String? @map("target_reps")
+  targetDurationSec Int?    @map("target_duration_sec")
+  targetDistanceM   Float?   @map("target_distance_m")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  planDay  PlanDay  @relation(fields: [planDayId], references: [id], onDelete: Cascade)
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([planDayId])
+  @@map("plan_day_exercises")
+}
+
+// ─── Workout Logging ─────────────────────────────────────
+
+model WorkoutSession {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  planId      String?       @map("plan_id") @db.Uuid
+  planDayId   String?       @map("plan_day_id") @db.Uuid
+  startedAt   DateTime      @map("started_at")
+  completedAt DateTime?     @map("completed_at")
+  durationSec Int?          @map("duration_sec")
+  notes       String?
+  status      SessionStatus @default(in_progress)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            WorkoutPlan?     @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planDay         PlanDay?         @relation(fields: [planDayId], references: [id], onDelete: SetNull)
+  exerciseLogs    ExerciseLog[]
+  personalRecords PersonalRecord[]
+
+  @@index([userId])
+  @@index([userId, startedAt])
+  @@map("workout_sessions")
+}
+
+model ExerciseLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  exerciseId String   @map("exercise_id") @db.Uuid
+  sortOrder  Int      @map("sort_order")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  setLogs  SetLog[]
+
+  @@index([sessionId])
+  @@map("exercise_logs")
+}
+
+model SetLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  exerciseLogId String    @map("exercise_log_id") @db.Uuid
+  setNumber     Int       @map("set_number")
+  reps          Int?
+  weightKg      Float?    @map("weight_kg")
+  durationSec   Int?      @map("duration_sec")
+  distanceM     Float?    @map("distance_m")
+  paceSecPerKm  Float?    @map("pace_sec_per_km")
+  heartRate     Int?      @map("heart_rate")
+  rpe           Int?
+  tempo         String?
+  isWarmup      Boolean   @default(false) @map("is_warmup")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  exerciseLog ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseLogId])
+  @@map("set_logs")
+}
+
+// ─── Progress & Streaks ──────────────────────────────────
+
+model PersonalRecord {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  exerciseId String     @map("exercise_id") @db.Uuid
+  recordType RecordType @map("record_type")
+  value      Float
+  achievedAt DateTime   @map("achieved_at")
+  sessionId  String?    @map("session_id") @db.Uuid
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise Exercise        @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  session  WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, exerciseId])
+  @@map("personal_records")
+}
+
+model Streak {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  currentStreak   Int       @default(0) @map("current_streak")
+  longestStreak   Int       @default(0) @map("longest_streak")
+  lastWorkoutDate DateTime? @map("last_workout_date") @db.Date
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("streaks")
+}
+
+model StreakHistory {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  date      DateTime     @db.Date
+  status    StreakStatus
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("streak_history")
+}
+
+// ─── Sync ────────────────────────────────────────────────
+
+model SyncQueue {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  tableName String        @map("table_name")
+  recordId  String        @map("record_id") @db.Uuid
+  operation SyncOperation
+  payload   Json
+  createdAt DateTime      @default(now()) @map("created_at")
+  syncedAt  DateTime?     @map("synced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, syncedAt])
+  @@map("sync_queue")
+}
