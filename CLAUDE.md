@@ -175,26 +175,31 @@ After the user has reviewed Step 2:
 
 **Phase 3 (Growth):** Social feed, follows, likes/comments, plan sharing, gamification (badges/XP/leaderboards), real-time features, freemium paywall, web dashboard.
 
-## Git Workflow (Strict)
+## Git Workflow (STRICT RULE)
 
-Two permanent branches: `main` and `dev`.
+**NEVER work directly on `main` or `dev`. Always create a feature branch.**
 
-```
-main ← dev ← feature/*
-```
+- **main**: Production branch. Only merged into from `dev` after ALL issues in a phase are completed.
+- **dev**: Integration branch. Only merged into from feature branches.
+- **feature branches**: Created from `dev` for every GitHub issue. Format: `feature/issue-<number>-<short-description>`.
 
-- **`main`:** Production-stable. Only receives merges from `dev` when a full phase is complete.
-- **`dev`:** Active development. All feature branches merge here.
-- **`feature/*`:** Created from `dev` for every new feature. Merged back into `dev` when done.
+**Flow**: `feature/* → dev → main`
 
-### Rules
-1. **Every new feature** gets its own branch off `dev` (e.g., `feature/auth`, `feature/workout-logging`)
-2. **Never commit directly** to `main` or `dev` — always use a feature branch
-3. **Merge feature → dev** when the feature is complete
-4. **Merge dev → main** only when an entire phase is complete (Phase 1, Phase 2, Phase 3)
-5. **Never merge feature branches directly into main**
-6. **When starting a new issue**, move its corresponding GitHub Project card to **"In Progress"**
-7. **When completing an issue**, move its corresponding GitHub Project card to **"Done"**
+**Steps for every issue:**
+1. **Move issue to "In Progress"**: `gh issue edit <number> --remove-project-status "Todo" --add-project-status "In Progress"` (or equivalent `gh` command to update project board status)
+2. `git checkout dev && git pull`
+3. `git checkout -b feature/issue-<number>-<short-description>`
+4. Do all work on the feature branch
+5. **Run code review**: Launch a code-reviewer agent to analyze all changes. Present the issues found to the user. Fix only the issues the user asks to fix.
+6. **Present review summary** to the user listing:
+   - All changes made (files created/modified)
+   - Data flow explanation (how data moves through the layers)
+   - Key decisions and patterns used
+7. **Wait for user approval** before committing. Do NOT commit until the user explicitly clears it.
+8. **Pull latest `dev` before merging**: `git checkout dev && git pull && git checkout - && git merge dev`. If there are merge conflicts, resolve them on the feature branch first, test that everything works, then proceed.
+9. After approval, commit and merge feature branch into `dev` with `--no-ff`
+10. **Move issue to "Done"**: `gh issue close <number>` and update project board status to "Done"
+11. Only after an entire phase is complete, merge `dev` into `main`
 
 ## API Conventions
 
