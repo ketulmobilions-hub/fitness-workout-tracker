@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        generate_for:
+          include:
+            - lib/src/local/app_database.dart
+            - lib/src/local/tables/*.dart
+            - lib/src/local/daos/*.dart
