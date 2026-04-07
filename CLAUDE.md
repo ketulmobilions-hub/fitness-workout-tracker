@@ -2,6 +2,52 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Commands
+
+### Backend (`server/`)
+
+```bash
+# Local dev (requires Docker services running)
+docker compose up -d          # Start PostgreSQL + Redis
+npm run dev                   # Start server with hot reload (tsx watch)
+
+# Build & type checking
+npm run build                 # prisma generate + tsc
+npm run typecheck             # tsc --noEmit (no emit, just type check)
+npm run lint                  # ESLint
+npm run lint:fix              # ESLint with auto-fix
+npm run format:check          # Prettier check
+
+# Database
+npm run db:migrate            # Run migrations (dev — creates migration files)
+npm run db:migrate:prod       # Deploy migrations (production)
+npm run db:seed               # Seed database
+npm run db:studio             # Open Prisma Studio (visual DB browser)
+npm run db:reset              # Reset DB and re-run all migrations + seed
+npm run db:generate           # Regenerate Prisma client after schema changes
+```
+
+> `.env` is required. Copy `server/.env.example` to `server/.env` and fill in `DATABASE_URL`.
+
+### Flutter App (`app/`)
+
+```bash
+# First-time setup after clone
+cd app && bash setup.sh       # pub get for all packages + code generation
+
+# Code generation (run after modifying any @freezed, @riverpod, or Retrofit annotated files)
+dart run build_runner build --delete-conflicting-outputs
+
+# Watch mode for code generation during development
+dart run build_runner watch --delete-conflicting-outputs
+
+# Sub-package dependencies (when modifying fitness_data or fitness_domain)
+cd packages/fitness_data && flutter pub get
+cd packages/fitness_domain && flutter pub get
+```
+
+---
+
 ## Project Overview
 
 Fitness & workout tracker app — custom workout plans, exercise logging, progress photos, streak tracking, social sharing, and health API integration. Freemium model, solo developer.
