@@ -2,6 +2,7 @@
   "name": "fitness-tracker-server",
   "version": "0.1.0",
   "description": "Fitness Workout Tracker API",
+  "type": "module",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
