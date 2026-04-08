@@ -49,7 +49,7 @@ jobs:
 
       - name: flutter pub get — app
         working-directory: app
-        run: flutter pub get
+        run: flutter pub get 
 
       # Generated files (*.g.dart, *.freezed.dart) are checked in — build_runner not needed in CI
       - name: Flutter analyze
