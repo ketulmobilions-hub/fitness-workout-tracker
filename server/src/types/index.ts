@@ -1,8 +1,3 @@
-export interface ApiError extends Error {
-  status: number;
-  details?: Array<{ field: string; message: string }>;
-}
-
 export interface HealthResponse {
   status: string;
   timestamp: string;
@@ -11,4 +6,15 @@ export interface HealthResponse {
     database: 'ok' | 'error';
     redis: 'ok' | 'disconnected' | 'error';
   };
+}
+
+export interface SuccessResponse<T> {
+  status: number;
+  data: T;
+}
+
+export interface ValidatedLocals {
+  body?: unknown;
+  query?: unknown;
+  params?: unknown;
 }

@@ -1,29 +1,42 @@
 import type { Request, Response, NextFunction } from 'express';
-import type { ApiError } from '../types/index.js';
+import { AppError } from '../utils/errors.js';
+import { env } from '../utils/env.js';
+
+const HTTP_STATUS_TEXT: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  422: 'Unprocessable Entity',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+  503: 'Service Unavailable',
+};
 
 export const errorHandler = (
-  err: ApiError | Error,
+  err: AppError | Error,
   _req: Request,
   res: Response,
   _next: NextFunction,
 ): void => {
-  const status = 'status' in err ? err.status : 500;
+  const status = err instanceof AppError ? err.status : 500;
+  const errorText = HTTP_STATUS_TEXT[status] ?? 'Internal Server Error';
 
   if (status >= 500) {
-    console.error(`[ERROR] ${err.name}: ${err.message}`, err.stack);
+    console.error(`[ERROR] ${err.message}`, err.stack);
   }
 
-  const isApiError = 'status' in err;
+  // Redact all 5xx messages in production — only 4xx AppErrors are safe to surface to clients.
+  const isClientError = err instanceof AppError && status < 500;
   const message =
-    status >= 500 && !isApiError ? 'An unexpected error occurred' : err.message || 'An unexpected error occurred';
+    !isClientError && env.NODE_ENV === 'production'
+      ? 'An unexpected error occurred'
+      : err.message || 'An unexpected error occurred';
 
-  const response: Record<string, unknown> = {
-    status,
-    error: err.name || 'Internal Server Error',
-    message,
-  };
+  const response: Record<string, unknown> = { status, error: errorText, message };
 
-  if ('details' in err && err.details) {
+  if (err instanceof AppError && err.details) {
     response.details = err.details;
   }
 
