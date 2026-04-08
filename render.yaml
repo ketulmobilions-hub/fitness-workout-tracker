@@ -1,0 +1,35 @@
+# Render infrastructure-as-code
+# https://render.com/docs/infrastructure-as-code
+#
+# After connecting this repo in the Render dashboard, set DATABASE_URL manually
+# in the service's Environment settings (it is marked sync: false below so Render
+# will not overwrite it once set).
+
+services:
+  - type: web
+    name: fitness-tracker-api
+    runtime: docker
+    region: oregon
+    plan: free           # Change to 'starter' or higher for production workloads
+
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+
+    branch: main
+    healthCheckPath: /api/v1/health
+
+    scaling:
+      minInstances: 1
+      maxInstances: 1    # Free tier supports single instance only
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Set this to your Render PostgreSQL internal connection string.
+      # sync: false prevents Render from overwriting a manually-configured value.
+      - key: DATABASE_URL
+        sync: false
+
+      - key: PORT
+        value: 3000

@@ -1,0 +1,58 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths: ['server/**']
+  pull_request:
+    branches: [main, dev]
+    paths: ['server/**']
+
+jobs:
+  backend:
+    name: Lint, Typecheck & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: server
+
+    env:
+      # Dummy URL — prisma generate parses the schema but makes no real DB connection in CI
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fitness_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          # cache-dependency-path required because package-lock.json is in a subdirectory
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      # Strict install — fails if package-lock.json is out of sync with package.json
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Runs: prisma generate (writes src/generated/) + tsc (emits dist/)
+      - name: Build
+        run: npm run build
+
+      # TODO: Add `npm test` once jest/vitest + supertest are installed
+      # See CLAUDE.md Testing Strategy for planned backend test coverage
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-dist
+          path: server/dist/
+          retention-days: 3
