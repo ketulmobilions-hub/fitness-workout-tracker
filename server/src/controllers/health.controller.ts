@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { HealthResponse } from '../types/index.js';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { sendSuccess } from '../utils/response.js';
 
 export const getHealth = async (_req: Request, res: Response): Promise<void> => {
   const [dbStatus, redisStatus] = await Promise.all([
@@ -33,5 +34,5 @@ export const getHealth = async (_req: Request, res: Response): Promise<void> => 
     services: { database: dbStatus, redis: redisStatus },
   };
 
-  res.status(healthy ? 200 : 503).json(response);
+  sendSuccess(res, response, healthy ? 200 : 503);
 };
