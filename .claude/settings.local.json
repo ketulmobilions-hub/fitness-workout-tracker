@@ -22,7 +22,10 @@
       "Bash(gh repo:*)",
       "Bash(gh auth:*)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('login'\\), d.get\\('name'\\)\\)\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(ls -la /Users/mobilions/development/fitness_workout_tracker/server/.env*)",
+      "Bash(ls:*)",
+      "Bash(git remote:*)"
     ]
   }
 }
