@@ -35,10 +35,6 @@ services:
     branch: main
     healthCheckPath: /api/v1/health
 
-    scaling:
-      minInstances: 1
-      maxInstances: 1     # Free tier supports single instance only
-
     envVars:
       - key: NODE_ENV
         value: production
