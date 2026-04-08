@@ -24,6 +24,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/generated ./src/generated
 COPY package.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 COPY start.sh ./
 RUN chmod +x start.sh
 USER node
