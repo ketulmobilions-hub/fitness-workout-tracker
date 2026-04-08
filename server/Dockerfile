@@ -8,6 +8,9 @@ RUN npm ci
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# DATABASE_URL is required by prisma.config.ts at generate time — this placeholder
+# is never used to connect; the real value is injected by Render at runtime.
+ENV DATABASE_URL=postgresql://build-placeholder:x@localhost:5432/placeholder
 RUN npm run build
 
 FROM base AS prod-deps
