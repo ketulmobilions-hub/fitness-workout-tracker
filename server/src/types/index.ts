@@ -7,4 +7,8 @@ export interface HealthResponse {
   status: string;
   timestamp: string;
   uptime: number;
+  services?: {
+    database: 'ok' | 'error';
+    redis: 'ok' | 'disconnected' | 'error';
+  };
 }
