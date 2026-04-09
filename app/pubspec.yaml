@@ -25,6 +25,12 @@ dependencies:
   dio: ^5.9.2
   retrofit: ^4.9.2
 
+  # Connectivity
+  connectivity_plus: ^6.1.4
+
+  # Secure Storage
+  flutter_secure_storage: ^9.2.4
+
   # Local packages
   fitness_data:
     path: packages/fitness_data
