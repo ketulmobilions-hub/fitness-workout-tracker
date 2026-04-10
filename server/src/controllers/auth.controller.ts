@@ -159,12 +159,12 @@ export const refresh = async (_req: Request, res: Response): Promise<void> => {
   // NOTE: The previous access token remains valid until it expires (≤15 min).
   // For stricter revocation, add a Redis-backed denylist keyed on the access token JTI.
   const result = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRaw<Array<{ now: Date; id: string; email: string | null }>>`
-      SELECT NOW() AS now, id, email FROM users WHERE id = ${payload.sub}::uuid FOR UPDATE
+    const rows = await tx.$queryRaw<Array<{ now: Date; id: string; email: string | null; is_guest: boolean }>>`
+      SELECT NOW() AS now, id, email, is_guest FROM users WHERE id = ${payload.sub}::uuid FOR UPDATE
     `;
     if (rows.length === 0) throw new AppError(401, 'User not found');
-    const { now, id, email } = rows[0];
-    if (!email) throw new AppError(500, 'User account has no email address');
+    const { now, id, email, is_guest: isGuest } = rows[0];
+    if (!email && !isGuest) throw new AppError(500, 'User account has no email address');
     const sevenDays = 7 * 24 * 60 * 60;
     const newExpiresAt = new Date(now.getTime() + sevenDays * 1000);
     const exp = Math.floor(now.getTime() / 1000) + sevenDays;
@@ -210,10 +210,10 @@ export const refresh = async (_req: Request, res: Response): Promise<void> => {
     await tx.refreshToken.create({
       data: { userId: payload.sub, tokenHash: hashToken(newRefreshToken, 'refresh'), expiresAt: newExpiresAt },
     });
-    return { id, email, newRefreshToken };
+    return { id, email, isGuest, newRefreshToken };
   });
 
-  const newAccessToken = generateAccessToken(result.id, result.email);
+  const newAccessToken = generateAccessToken(result.id, result.email, result.isGuest);
   sendSuccess(res, { accessToken: newAccessToken, refreshToken: result.newRefreshToken });
 };
 
@@ -434,6 +434,213 @@ export const appleSignIn = async (_req: Request, res: Response): Promise<void> =
     user: { id: user.id, email: user.email, displayName: user.displayName },
     accessToken,
     refreshToken,
+  });
+};
+
+export const createGuest = async (_req: Request, res: Response): Promise<void> => {
+  const user = await prisma.user.create({
+    data: { authProvider: 'guest', isGuest: true },
+  });
+
+  const accessToken = generateAccessToken(user.id, null, true);
+  const refreshToken = await storeRefreshToken(user.id);
+
+  // Include email and displayName as null to keep the response shape consistent with all
+  // other auth endpoints — clients can treat the user object uniformly regardless of path.
+  sendSuccess(res, { user: { id: user.id, email: null, displayName: null }, accessToken, refreshToken }, 201);
+};
+
+// ─── Upgrade Guest ───────────────────────────────────────────────────────────
+
+// Converts an authenticated guest account to a full account by attaching email/password
+// or OAuth credentials. All data created during the guest session transfers automatically
+// because every record references userId, which remains unchanged.
+//
+// The upgrade runs inside a single transaction that:
+//   1. Locks the user row (FOR UPDATE) to serialize concurrent upgrade requests.
+//   2. Re-reads isGuest from the DB — the JWT claim could be stale if a concurrent request
+//      already upgraded the account before this one acquired the lock.
+//   3. Checks for credential conflicts (email or providerUserId already owned by another user).
+//   4. Atomically updates the user, revokes all old refresh tokens, and creates a new one.
+//      Revoking all refresh tokens ensures a clean break: old guest tokens are invalidated
+//      and the client receives a fresh pair reflecting the upgraded account.
+//   5. Creates the new refresh token inside the same transaction so there is no window
+//      between "old tokens revoked" and "new token exists" — a partial failure on a separate
+//      second transaction would otherwise leave the user locked out.
+export const upgradeGuest = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+  const body = res.locals.validated!.body as
+    | { type: 'email'; email: string; password: string; displayName?: string }
+    | { type: 'google'; idToken: string }
+    | { type: 'apple'; identityToken: string; displayName?: string };
+
+  // Pre-compute expensive/network operations outside the transaction:
+  // - bcrypt at cost 12 takes ~200ms; holding a DB connection that long increases pressure
+  // - OAuth token verification involves network calls to Google/Apple JWKS endpoints
+  // Using else-if ensures oauthProviderUserId is set iff body.type is 'google' or 'apple',
+  // which TypeScript cannot enforce inside the transaction body — the narrowing is safe here.
+  let passwordHash: string | undefined;
+  let oauthProviderUserId: string | undefined;
+  let oauthEmail: string | null | undefined;
+  let oauthDisplayName: string | undefined;
+
+  if (body.type === 'email') {
+    passwordHash = await bcrypt.hash(body.password, 12);
+  } else if (body.type === 'google') {
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({ idToken: body.idToken, audience: env.GOOGLE_CLIENT_ID });
+      payload = ticket.getPayload();
+    } catch {
+      throw new AppError(401, 'Invalid Google ID token');
+    }
+    if (!payload?.sub) throw new AppError(401, 'Invalid Google ID token');
+    if (!payload.email_verified) throw new AppError(401, 'Google account email is not verified');
+    if (payload.sub.length > MAX_PROVIDER_USER_ID_LENGTH) throw new AppError(401, 'Invalid provider token');
+    oauthProviderUserId = payload.sub;
+    // Normalize to lowercase — providers can return mixed-case addresses (e.g. User@Gmail.com).
+    // The email column stores pre-normalized values; a mismatch would create a lookup-invisible
+    // duplicate that blocks the user from signing in via any non-OAuth path.
+    oauthEmail = payload.email ? payload.email.toLowerCase().trim() : null;
+    oauthDisplayName = payload.name;
+  } else {
+    // body.type === 'apple'
+    let applePayload: Awaited<ReturnType<typeof appleSignin.verifyIdToken>>;
+    try {
+      applePayload = await appleSignin.verifyIdToken(body.identityToken, {
+        audience: env.APPLE_APP_BUNDLE_ID,
+        ignoreExpiration: false,
+      });
+    } catch {
+      throw new AppError(401, 'Invalid Apple identity token');
+    }
+    if (!applePayload.sub) throw new AppError(401, 'Invalid Apple identity token');
+    if (applePayload.sub.length > MAX_PROVIDER_USER_ID_LENGTH) throw new AppError(401, 'Invalid provider token');
+    oauthProviderUserId = applePayload.sub;
+    oauthEmail = applePayload.email ? applePayload.email.toLowerCase().trim() : null;
+    oauthDisplayName = body.displayName;
+  }
+
+  // Single transaction: lock user row, verify guest state, update credentials, revoke old
+  // tokens, and create the new refresh token — all atomically.
+  // Either the whole upgrade succeeds and the client gets a valid token pair, or it rolls
+  // back entirely. There is no window where the account is upgraded but has zero valid tokens.
+  const { email: upgradedEmail, displayName: upgradedDisplayName, rawRefreshToken } =
+    await prisma.$transaction(async (tx) => {
+      // Lock the user row and fetch DB time in one query. FOR UPDATE serializes concurrent
+      // upgrade requests for the same account so no two requests can both pass the isGuest
+      // check and write conflicting credentials simultaneously.
+      const rows = await tx.$queryRaw<Array<{ id: string; is_guest: boolean; now: Date }>>`
+        SELECT id, is_guest, NOW() AS now FROM users WHERE id = ${userId}::uuid FOR UPDATE
+      `;
+      if (rows.length === 0) throw new AppError(401, 'Upgrade not available');
+      const { is_guest: isGuestDb, now } = rows[0];
+
+      // Re-check isGuest from DB — JWT claim could be stale if a prior request already upgraded.
+      // Uniform message for both cases (user deleted vs already upgraded) to avoid leaking
+      // account state to a client holding a stolen JWT.
+      if (!isGuestDb) throw new AppError(409, 'Upgrade not available');
+
+      let email: string | null;
+      let displayName: string | null;
+
+      if (body.type === 'email') {
+        const emailNormalized = body.email.toLowerCase().trim();
+
+        // findUnique inside the locked transaction — any concurrent upgrade with the same
+        // email is serialized by the FOR UPDATE above and sees our committed update.
+        // The P2002 catch below is a last-resort guard for the pathological case of a
+        // concurrent /register call for the same email winning between our findUnique and update.
+        const conflict = await tx.user.findUnique({ where: { email: emailNormalized }, select: { id: true } });
+        if (conflict && conflict.id !== userId) throw new AppError(409, 'Email already in use');
+
+        try {
+          await tx.user.update({
+            where: { id: userId },
+            data: { email: emailNormalized, passwordHash, authProvider: 'email', isGuest: false, displayName: body.displayName ?? null },
+          });
+        } catch (err: unknown) {
+          if (err !== null && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+            throw new AppError(409, 'Email already in use');
+          }
+          throw err;
+        }
+
+        email = emailNormalized;
+        displayName = body.displayName ?? null;
+      } else {
+        // Google or Apple — oauthProviderUserId is guaranteed non-undefined by the else-if chain above.
+        const providerUserId = oauthProviderUserId as string;
+        const oEmail = oauthEmail ?? null;
+        displayName = oauthDisplayName ?? null;
+
+        const conflictById = await tx.user.findUnique({ where: { providerUserId }, select: { id: true } });
+        if (conflictById && conflictById.id !== userId) {
+          throw new AppError(409, 'Social account already linked to another user');
+        }
+
+        if (oEmail) {
+          const conflictByEmail = await tx.user.findUnique({ where: { email: oEmail }, select: { id: true } });
+          if (conflictByEmail && conflictByEmail.id !== userId) throw new AppError(409, 'Email already in use');
+        }
+
+        try {
+          await tx.user.update({
+            where: { id: userId },
+            data: { authProvider: body.type, providerUserId, email: oEmail, isGuest: false, displayName },
+          });
+        } catch (err: unknown) {
+          if (err !== null && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
+            // Unique constraint on providerUserId or email — concurrent double-submit race
+            throw new AppError(409, 'Account credentials already in use');
+          }
+          throw err;
+        }
+
+        email = oEmail;
+      }
+
+      // Revoke all existing refresh tokens using DB time — consistent with the rest of the
+      // codebase which always derives timestamps from PostgreSQL NOW(), not the Node.js clock,
+      // to prevent skew at the 7-day expiry boundary.
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+
+      // Inline the new refresh token creation (same logic as storeRefreshToken) inside this
+      // transaction so the upgrade is fully atomic — no separate second transaction that could
+      // fail and leave the account with zero valid tokens.
+      const sevenDays = 7 * 24 * 60 * 60;
+      const expiresAt = new Date(now.getTime() + sevenDays * 1000);
+      const exp = Math.floor(now.getTime() / 1000) + sevenDays;
+      const rawToken = generateRefreshToken(userId, exp);
+
+      // Remove stale tokens then cap active sessions at 20 (same policy as storeRefreshToken).
+      await tx.refreshToken.deleteMany({
+        where: { userId, OR: [{ revokedAt: { not: null } }, { expiresAt: { lte: now } }] },
+      });
+      const overflow = await tx.refreshToken.findMany({
+        where: { userId, revokedAt: null, expiresAt: { gt: now } },
+        orderBy: { createdAt: 'desc' },
+        skip: 19,
+        select: { id: true },
+      });
+      if (overflow.length > 0) {
+        await tx.refreshToken.deleteMany({ where: { id: { in: overflow.map((t) => t.id) } } });
+      }
+      await tx.refreshToken.create({
+        data: { userId, tokenHash: hashToken(rawToken, 'refresh'), expiresAt },
+      });
+
+      return { email, displayName, rawRefreshToken: rawToken };
+    });
+
+  const accessToken = generateAccessToken(userId, upgradedEmail, false);
+  sendSuccess(res, {
+    user: { id: userId, email: upgradedEmail, displayName: upgradedDisplayName },
+    accessToken,
+    refreshToken: rawRefreshToken,
   });
 };
 

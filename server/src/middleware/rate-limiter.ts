@@ -101,3 +101,31 @@ export const resetPasswordLimiter = rateLimit({
     message: 'Too many password reset attempts, please try again later.',
   },
 });
+
+// For guest account creation: stricter than authLimiter because there is no credential to
+// deduplicate against — each call inserts a new user row. 3/window significantly reduces
+// the surface for DB flooding via IP rotation while remaining invisible to real users (who
+// create at most one guest session per 15-minute window).
+export const guestLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:guest:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 3,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many guest account requests, please try again later.',
+  },
+});
+
+// For guest-to-full-account upgrade: credential-sensitive (attaches email/OAuth),
+// so the same budget as authLimiter is appropriate.
+export const upgradeLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:upgrade:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 10,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many upgrade attempts, please try again later.',
+  },
+});
