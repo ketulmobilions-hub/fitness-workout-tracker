@@ -66,13 +66,15 @@ model User {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
-  exercises       Exercise[]
-  workoutPlans    WorkoutPlan[]
-  workoutSessions WorkoutSession[]
-  personalRecords PersonalRecord[]
-  streak          Streak?
-  streakHistory   StreakHistory[]
-  syncQueue       SyncQueue[]
+  exercises           Exercise[]
+  workoutPlans        WorkoutPlan[]
+  workoutSessions     WorkoutSession[]
+  personalRecords     PersonalRecord[]
+  streak              Streak?
+  streakHistory       StreakHistory[]
+  syncQueue           SyncQueue[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -297,6 +299,36 @@ model StreakHistory {
   @@unique([userId, date])
   @@index([userId])
   @@map("streak_history")
+}
+
+// ─── Auth Tokens ─────────────────────────────────────────
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ─── Sync ────────────────────────────────────────────────
