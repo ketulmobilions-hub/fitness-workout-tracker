@@ -23,6 +23,8 @@ const envSchema = z
     // Use 'example.invalid' (.invalid is an IANA-reserved TLD) to make misconfiguration
     // immediately obvious — emails from this default will be rejected by mail servers.
     SMTP_FROM: z.string().default('noreply@example.invalid'),
+    GOOGLE_CLIENT_ID: z.string().min(1),
+    APPLE_APP_BUNDLE_ID: z.string().min(1),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.CORS_ORIGIN) {

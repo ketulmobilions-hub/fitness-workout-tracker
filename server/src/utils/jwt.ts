@@ -3,7 +3,10 @@ import crypto from 'node:crypto';
 import { env } from './env.js';
 import { AppError } from './errors.js';
 
-export const generateAccessToken = (userId: string, email: string): string => {
+// `email` is `string | null` to accommodate Apple sign-in users who may have no email address
+// (Apple only provides the email claim on first authorization). Callers that need an email
+// address (e.g. notifications, profile display) must check for null before using this field.
+export const generateAccessToken = (userId: string, email: string | null): string => {
   return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: '15m' });
 };
 
@@ -23,21 +26,23 @@ export const generateRefreshToken = (userId: string, exp?: number): string => {
   return jwt.sign({ sub: userId, jti: crypto.randomUUID() }, env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 };
 
-export const verifyAccessToken = (token: string): { sub: string; email: string } => {
+export const verifyAccessToken = (token: string): { sub: string; email: string | null } => {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     // Runtime guard — the `as` cast alone would silently pass tokens missing required fields.
     // `typeof decoded.sub !== 'string'` is explicit: the JWT spec allows any type for `sub`,
     // and a crafted token with a numeric sub would pass a falsy check while being invalid.
+    // `email` is allowed to be null for Apple sign-in users who have no email address.
+    const emailClaim = (decoded as Record<string, unknown>)['email'];
     if (
       typeof decoded === 'string' ||
       typeof decoded.sub !== 'string' ||
       !decoded.sub ||
-      typeof decoded['email'] !== 'string'
+      (emailClaim !== null && typeof emailClaim !== 'string')
     ) {
       throw new AppError(401, 'Invalid or expired access token');
     }
-    return { sub: decoded.sub, email: decoded['email'] as string };
+    return { sub: decoded.sub, email: emailClaim as string | null };
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(401, 'Invalid or expired access token');

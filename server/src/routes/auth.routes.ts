@@ -30,6 +30,15 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
+const googleSchema = z.object({
+  idToken: z.string().min(1),
+});
+
+const appleSchema = z.object({
+  identityToken: z.string().min(1),
+  displayName: z.string().min(1).max(50).optional(),
+});
+
 // authLimiter (10/window)       — login, register: credential-sensitive
 // refreshLimiter (60/window)    — token rotation: separate budget so a refresh storm on one
 //                                  device doesn't exhaust the auth limit and block other routes
@@ -41,5 +50,7 @@ router.post('/login', authLimiter, validate({ body: loginSchema }), auth.login);
 router.post('/refresh', refreshLimiter, validate({ body: refreshSchema }), auth.refresh);
 router.post('/forgot-password', forgotPasswordLimiter, validate({ body: forgotPasswordSchema }), auth.forgotPassword);
 router.post('/reset-password', resetPasswordLimiter, validate({ body: resetPasswordSchema }), auth.resetPassword);
+router.post('/google', authLimiter, validate({ body: googleSchema }), auth.googleSignIn);
+router.post('/apple', authLimiter, validate({ body: appleSchema }), auth.appleSignIn);
 
 export default router;
