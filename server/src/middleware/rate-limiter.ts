@@ -4,16 +4,22 @@ import { redis } from '../lib/redis.js';
 import { env } from '../utils/env.js';
 
 // Use Redis as the backing store so counters survive deploys and are shared
-// across all server instances. Falls back to in-memory with a warning if Redis
-// is not configured (e.g. local dev without REDIS_URL).
+// across all server instances. Falls back to in-memory in dev/test only.
+// NOTE: makeStore is called at module-evaluation time (top-level rateLimit() calls below).
+// The throw in the production path is guarded by env.ts superRefine, which rejects
+// startup if REDIS_URL is absent in production — so the throw should never be reached
+// in a correctly configured deployment.
 function makeStore(prefix: string): Store | undefined {
   if (!redis) {
     if (env.NODE_ENV === 'production') {
-      console.warn(
-        `[rate-limiter] REDIS_URL not set — using in-memory store for "${prefix}". Counters will reset on restart.`,
+      // Should not be reachable — env.ts requires REDIS_URL in production.
+      // Throw anyway so a misconfigured deploy fails loudly at startup rather than
+      // silently giving each instance its own counter.
+      throw new Error(
+        `[rate-limiter] REDIS_URL not set in production — in-memory fallback would give each instance its own counter, defeating rate limiting on multi-instance deployments`,
       );
     }
-    return undefined; // express-rate-limit defaults to MemoryStore
+    return undefined; // express-rate-limit defaults to MemoryStore in dev/test
   }
 
   const client = redis; // narrow to non-null for the closure
@@ -21,7 +27,7 @@ function makeStore(prefix: string): Store | undefined {
     prefix,
     sendCommand: async (...args: [string, ...string[]]): Promise<number> => {
       const [command, ...rest] = args;
-      return client.call(command, ...rest) as Promise<number>;
+      return (await client.call(command, ...rest)) as number;
     },
   });
 }
@@ -43,13 +49,55 @@ export const globalLimiter = rateLimit({
   },
 });
 
+// For login and register: 10 attempts per window. 10 is generous for legitimate use
+// (most users login ≤3 times per 15-min window) while meaningfully slowing credential stuffing.
 export const authLimiter = rateLimit({
   ...baseOptions(makeStore('rl:auth:')),
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: 20,
+  max: 10,
   message: {
     status: 429,
     error: 'Too Many Requests',
     message: 'Too many authentication attempts, please try again later.',
+  },
+});
+
+// For token refresh: separate per-IP budget so a refresh storm on one device doesn't
+// consume the global limit and lock out other routes. Higher than authLimiter because
+// the app rotates tokens automatically (one per session per 15-min window normally).
+export const refreshLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:refresh:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 60,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many refresh attempts, please try again later.',
+  },
+});
+
+// For forgot-password: stricter limit to prevent email flooding
+export const forgotPasswordLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:forgot:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 5,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many password reset attempts, please try again later.',
+  },
+});
+
+// For reset-password: separate budget so junk reset attempts cannot exhaust the authLimiter
+// counter and lock out /login from the same IP. Brute-forcing the 256-bit token is infeasible,
+// so 10/window is purely to prevent abuse of the endpoint.
+export const resetPasswordLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:reset:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 10,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many password reset attempts, please try again later.',
   },
 });
