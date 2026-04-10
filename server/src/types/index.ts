@@ -1,3 +1,9 @@
+export interface AuthLocals {
+  userId: string;
+  email: string | null;
+  isGuest: boolean;
+}
+
 export interface HealthResponse {
   status: string;
   timestamp: string;

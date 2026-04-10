@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { authLimiter, forgotPasswordLimiter, refreshLimiter, resetPasswordLimiter } from '../middleware/rate-limiter.js';
+import { authLimiter, forgotPasswordLimiter, guestLimiter, refreshLimiter, resetPasswordLimiter, upgradeLimiter } from '../middleware/rate-limiter.js';
 import { validate } from '../middleware/validate.js';
+import { authenticate } from '../middleware/authenticate.js';
 import * as auth from '../controllers/auth.controller.js';
 
 const router = Router();
@@ -39,6 +40,25 @@ const appleSchema = z.object({
   displayName: z.string().min(1).max(50).optional(),
 });
 
+// Discriminated union so validation error messages name the exact failing field per upgrade type.
+const upgradeSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('email'),
+    email: z.string().email(),
+    password: z.string().min(8).max(128),
+    displayName: z.string().min(1).max(50).optional(),
+  }),
+  z.object({
+    type: z.literal('google'),
+    idToken: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal('apple'),
+    identityToken: z.string().min(1),
+    displayName: z.string().min(1).max(50).optional(),
+  }),
+]);
+
 // authLimiter (10/window)       — login, register: credential-sensitive
 // refreshLimiter (60/window)    — token rotation: separate budget so a refresh storm on one
 //                                  device doesn't exhaust the auth limit and block other routes
@@ -52,5 +72,7 @@ router.post('/forgot-password', forgotPasswordLimiter, validate({ body: forgotPa
 router.post('/reset-password', resetPasswordLimiter, validate({ body: resetPasswordSchema }), auth.resetPassword);
 router.post('/google', authLimiter, validate({ body: googleSchema }), auth.googleSignIn);
 router.post('/apple', authLimiter, validate({ body: appleSchema }), auth.appleSignIn);
+router.post('/guest', guestLimiter, auth.createGuest);
+router.post('/upgrade', upgradeLimiter, authenticate, validate({ body: upgradeSchema }), auth.upgradeGuest);
 
 export default router;

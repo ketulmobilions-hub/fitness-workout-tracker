@@ -6,8 +6,11 @@ import { AppError } from './errors.js';
 // `email` is `string | null` to accommodate Apple sign-in users who may have no email address
 // (Apple only provides the email claim on first authorization). Callers that need an email
 // address (e.g. notifications, profile display) must check for null before using this field.
-export const generateAccessToken = (userId: string, email: string | null): string => {
-  return jwt.sign({ sub: userId, email }, env.JWT_SECRET, { expiresIn: '15m' });
+// `isGuest` is embedded in the payload so downstream middleware can gate features without a
+// DB hit. Guest claims expire within 15 minutes, which is an acceptable window for stale state
+// after an upgrade.
+export const generateAccessToken = (userId: string, email: string | null, isGuest = false): string => {
+  return jwt.sign({ sub: userId, email, isGuest }, env.JWT_SECRET, { expiresIn: '15m' });
 };
 
 export const generateRefreshToken = (userId: string, exp?: number): string => {
@@ -26,14 +29,19 @@ export const generateRefreshToken = (userId: string, exp?: number): string => {
   return jwt.sign({ sub: userId, jti: crypto.randomUUID() }, env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 };
 
-export const verifyAccessToken = (token: string): { sub: string; email: string | null } => {
+export const verifyAccessToken = (token: string): { sub: string; email: string | null; isGuest: boolean } => {
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     // Runtime guard — the `as` cast alone would silently pass tokens missing required fields.
     // `typeof decoded.sub !== 'string'` is explicit: the JWT spec allows any type for `sub`,
     // and a crafted token with a numeric sub would pass a falsy check while being invalid.
     // `email` is allowed to be null for Apple sign-in users who have no email address.
-    const emailClaim = (decoded as Record<string, unknown>)['email'];
+    // `isGuest` defaults to false for tokens issued before this field was added (backwards-compat).
+    const claims = decoded as Record<string, unknown>;
+    const emailClaim = claims['email'];
+    // `emailClaim !== null && typeof emailClaim !== 'string'` also rejects `undefined`
+    // (undefined !== null is true), which correctly blocks tokens missing the email claim
+    // entirely. The intent is: accept only string or null, reject everything else.
     if (
       typeof decoded === 'string' ||
       typeof decoded.sub !== 'string' ||
@@ -42,7 +50,7 @@ export const verifyAccessToken = (token: string): { sub: string; email: string |
     ) {
       throw new AppError(401, 'Invalid or expired access token');
     }
-    return { sub: decoded.sub, email: emailClaim as string | null };
+    return { sub: decoded.sub, email: emailClaim as string | null, isGuest: claims['isGuest'] === true };
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(401, 'Invalid or expired access token');
