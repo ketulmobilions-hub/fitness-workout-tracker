@@ -50,6 +50,13 @@ class AuthNotifier extends _$AuthNotifier {
   /// sets state imperatively. Guards every write with [_isLive] so it cannot
   /// overwrite a state that was set by an action method or a newer build().
   Future<void> _restoreSession(String accessToken, int generation) async {
+    // Yield to the event loop before writing any state. build() calls this
+    // method without await, so without this yield the first state write could
+    // happen while build() has not yet returned — at which point Riverpod
+    // drops the assignment because the provider is still in its build phase.
+    // All non-trivial paths already have a natural await (the DB read), but
+    // the early-return path (null sub, malformed JWT) does not.
+    await Future<void>.delayed(Duration.zero);
     final userId = _extractSubFromJwt(accessToken);
     if (userId == null) {
       _setStateGuarded(const AuthState.unauthenticated(), generation);
