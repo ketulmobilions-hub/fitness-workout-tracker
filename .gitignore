@@ -46,11 +46,15 @@ app.*.map.json
 **/android/app/profile
 **/android/app/release
 
-# Node.js (server/)
-server/node_modules/
+# Node.js
+node_modules/
 server/dist/
 server/.env
 server/.env.*
+
+# Accidental root-level npm artifacts
+/package.json
+/package-lock.json
 
 # Secrets
 .env
