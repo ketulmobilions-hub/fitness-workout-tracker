@@ -31,6 +31,13 @@ dependencies:
   # Secure Storage
   flutter_secure_storage: ^9.2.4
 
+  # OAuth
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+
+  # Drift (needed for UsersCompanion Value<T> wrapper in repository impl)
+  drift: ^2.22.1
+
   # Local packages
   fitness_data:
     path: packages/fitness_data

@@ -1,6 +1,11 @@
 /// Data layer — API clients, DTOs, local database access.
 library;
 
+// Remote API clients
+export 'src/remote/auth_api_client.dart';
+export 'src/remote/dtos/auth_request_dtos.dart';
+export 'src/remote/dtos/auth_response_dtos.dart';
+
 // Local database
 export 'src/local/app_database.dart';
 
