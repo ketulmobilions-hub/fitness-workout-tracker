@@ -14,6 +14,21 @@ import 'app_routes.dart';
 
 part 'app_router.g.dart';
 
+/// Pure redirect resolver — exported for unit testing.
+///
+/// Returns the target route path when a redirect is needed, or `null` to allow
+/// the current navigation to proceed.
+String? resolveAuthRedirect(AuthState authState, String location) {
+  final onAuthPage =
+      location.startsWith('/auth') || location == AppRoutes.splash;
+  return switch (authState) {
+    AuthInitializing() => null,
+    AuthLoading() => null,
+    AuthUnauthenticated() => onAuthPage ? null : AppRoutes.login,
+    Authenticated() || AuthGuest() => onAuthPage ? AppRoutes.home : null,
+  };
+}
+
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   // A ChangeNotifier that fires whenever the auth state changes.
@@ -40,24 +55,10 @@ GoRouter appRouter(Ref ref) {
       // authProvider because ref.listen updates it before GoRouter fires
       // this redirect. This avoids going back through ref.read and makes
       // the coupling explicit.
-      final authState = authListenable.value;
-      final location = routerState.matchedLocation;
-      // Splash ('/') is a safe page during loading; treat it like an auth page
-      // so a transient unauthenticated state doesn't redirect away from it.
-      final onAuthPage =
-          location.startsWith('/auth') || location == AppRoutes.splash;
-
-      return switch (authState) {
-        // Still loading tokens from storage — stay on splash.
-        AuthInitializing() => null,
-        // Loading spinner during a login/register action — no redirect.
-        AuthLoading() => null,
-        // No session — send to login unless already on an auth page.
-        AuthUnauthenticated() => onAuthPage ? null : AppRoutes.login,
-        // Authenticated (full or guest) — send away from auth pages.
-        Authenticated() || AuthGuest() =>
-          onAuthPage ? AppRoutes.home : null,
-      };
+      return resolveAuthRedirect(
+        authListenable.value,
+        routerState.matchedLocation,
+      );
     },
     routes: [
       GoRoute(
