@@ -1,6 +1,7 @@
 import { PrismaClient } from '../generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { env } from '../utils/env.js';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -9,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): { client: PrismaClient; pool: pg.Pool } {
   const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: env.DATABASE_URL,
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
@@ -22,7 +23,7 @@ function createPrismaClient(): { client: PrismaClient; pool: pg.Pool } {
   const adapter = new PrismaPg(pool);
   const client = new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
   return { client, pool };
 }
