@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/app_routes.dart';
 import '../../providers/auth_notifier.dart';
 import '../../providers/auth_state.dart';
 
@@ -70,8 +72,14 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.fitness_center),
+                label: const Text('Browse Exercises'),
+                onPressed: () => context.push(AppRoutes.exercises),
+              ),
+              const SizedBox(height: 12),
               Text(
-                'Workout features coming soon.',
+                'More workout features coming soon.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],

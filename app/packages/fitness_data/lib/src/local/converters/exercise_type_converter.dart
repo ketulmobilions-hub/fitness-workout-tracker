@@ -1,11 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 
-enum ExerciseType {
-  strength,
-  cardio,
-  stretching,
-}
+// Re-export so existing code that imports this file still gets ExerciseType.
+export 'package:fitness_domain/fitness_domain.dart' show ExerciseType;
 
 class ExerciseTypeConverter extends TypeConverter<ExerciseType, String> {
   const ExerciseTypeConverter();
