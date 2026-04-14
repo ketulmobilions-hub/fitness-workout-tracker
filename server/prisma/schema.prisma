@@ -107,10 +107,12 @@ model Exercise {
 
   creator          User?                 @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   muscleGroups     ExerciseMuscleGroup[]
+  equipment        ExerciseEquipment[]
   planDayExercises PlanDayExercise[]
   exerciseLogs     ExerciseLog[]
   personalRecords  PersonalRecord[]
 
+  @@unique([name])
   @@index([exerciseType])
   @@index([createdBy])
   @@map("exercises")
@@ -125,7 +127,32 @@ model ExerciseMuscleGroup {
   muscleGroup MuscleGroup @relation(fields: [muscleGroupId], references: [id], onDelete: Cascade)
 
   @@id([exerciseId, muscleGroupId])
+  @@index([muscleGroupId])
   @@map("exercise_muscle_groups")
+}
+
+model Equipment {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  exercises ExerciseEquipment[]
+
+  @@map("equipment")
+}
+
+model ExerciseEquipment {
+  exerciseId  String @map("exercise_id") @db.Uuid
+  equipmentId String @map("equipment_id") @db.Uuid
+
+  exercise  Exercise  @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@id([exerciseId, equipmentId])
+  @@index([equipmentId])
+  @@map("exercise_equipment")
 }
 
 // ─── Workout Plans ───────────────────────────────────────
