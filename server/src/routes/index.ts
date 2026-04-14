@@ -3,6 +3,7 @@ import healthRoutes from './health.routes.js';
 import authRoutes from './auth.routes.js';
 import exerciseRoutes from './exercise.routes.js';
 import muscleGroupRoutes from './muscle-group.routes.js';
+import planRoutes from './plan.routes.js';
 
 const router = Router();
 
@@ -10,5 +11,6 @@ router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/exercises', exerciseRoutes);
 router.use('/muscle-groups', muscleGroupRoutes);
+router.use('/plans', planRoutes);
 
 export default router;

@@ -168,11 +168,15 @@ model WorkoutPlan {
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
+  deletedAt DateTime?        @map("deleted_at")
+
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   planDays PlanDay[]
   sessions WorkoutSession[]
 
-  @@index([userId])
+  // Composite index on (userId, deletedAt) matches the WHERE clause pattern used on
+  // every plan query — prevents full-index scans as soft-deleted rows accumulate.
+  @@index([userId, deletedAt])
   @@map("workout_plans")
 }
 
