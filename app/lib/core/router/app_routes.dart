@@ -8,4 +8,13 @@ abstract final class AppRoutes {
   static const resetPassword = '/auth/reset-password';
 
   static const home = '/home';
+
+  // Exercise routes
+  static const exercises = '/exercises';
+  static const createExercise = '/exercises/create';
+  static const exerciseDetail = '/exercises/:exerciseId';
+
+  /// Returns the concrete path for navigating to a specific exercise detail
+  /// screen, e.g. `/exercises/abc-123`.
+  static String exerciseDetailPath(String id) => '/exercises/$id';
 }

@@ -5,6 +5,8 @@ library;
 export 'src/remote/auth_api_client.dart';
 export 'src/remote/dtos/auth_request_dtos.dart';
 export 'src/remote/dtos/auth_response_dtos.dart';
+export 'src/remote/exercise_api_client.dart';
+export 'src/remote/dtos/exercise_dtos.dart';
 
 // Local database
 export 'src/local/app_database.dart';

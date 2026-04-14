@@ -11,8 +11,6 @@ dependencies:
     sdk: flutter
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
-  fitness_data:
-    path: ../fitness_data
 
 dev_dependencies:
   flutter_test:

@@ -10,6 +10,9 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/providers/auth_notifier.dart';
 import '../../features/auth/providers/auth_state.dart';
+import '../../features/exercises/presentation/screens/create_exercise_screen.dart';
+import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
+import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import 'app_routes.dart';
 
 part 'app_router.g.dart';
@@ -86,6 +89,22 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.exercises,
+        builder: (context, state) => const ExerciseListScreen(),
+      ),
+      // Static route must come BEFORE the parameterized sibling so GoRouter
+      // does not match the literal string "create" as an exerciseId.
+      GoRoute(
+        path: AppRoutes.createExercise,
+        builder: (context, state) => const CreateExerciseScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.exerciseDetail,
+        builder: (context, state) => ExerciseDetailScreen(
+          exerciseId: state.pathParameters['exerciseId']!,
+        ),
       ),
     ],
   );
