@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 
 import 'converters/auth_provider_converter.dart';
 import 'converters/date_string_converter.dart';
@@ -70,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -96,8 +97,18 @@ class AppDatabase extends _$AppDatabase {
         );
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Future migrations: if (from < 2) { await m.addColumn(...); }
-        // For complex upgrades, consider the stepByStep() helper.
+        // v1 → v2: add createdAt/updatedAt to plan_days and plan_day_exercises
+        // to support last-write-wins conflict resolution in the sync engine.
+        // Existing rows receive the wall-clock time at migration (SQLite sets
+        // the column to its DEFAULT expression for all pre-existing rows).
+        // This means pre-migration rows appear "created/updated now" rather
+        // than at their true server timestamps — acceptable for dev data.
+        if (from < 2) {
+          await m.addColumn(planDays, planDays.createdAt);
+          await m.addColumn(planDays, planDays.updatedAt);
+          await m.addColumn(planDayExercises, planDayExercises.createdAt);
+          await m.addColumn(planDayExercises, planDayExercises.updatedAt);
+        }
       },
     );
   }

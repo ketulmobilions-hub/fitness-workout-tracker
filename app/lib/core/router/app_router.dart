@@ -13,6 +13,7 @@ import '../../features/auth/providers/auth_state.dart';
 import '../../features/exercises/presentation/screens/create_exercise_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
+import '../../features/workout_plans/workout_plans.dart';
 import 'app_routes.dart';
 
 part 'app_router.g.dart';
@@ -104,6 +105,16 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.exerciseDetail,
         builder: (context, state) => ExerciseDetailScreen(
           exerciseId: state.pathParameters['exerciseId']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.plans,
+        builder: (context, state) => const PlanListScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.planDetail,
+        builder: (context, state) => PlanDetailScreen(
+          planId: state.pathParameters['planId']!,
         ),
       ),
     ],
