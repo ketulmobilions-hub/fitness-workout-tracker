@@ -1,7 +1,9 @@
 import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/app_routes.dart';
 import '../../providers/plan_detail_provider.dart';
 import '../widgets/plan_day_section.dart';
 
@@ -20,6 +22,13 @@ class PlanDetailScreen extends ConsumerWidget {
           data: (plan) => Text(plan?.name ?? 'Plan'),
           orElse: () => const Text('Plan'),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit plan',
+            onPressed: () => context.push(AppRoutes.editPlanPath(planId)),
+          ),
+        ],
       ),
       body: planAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

@@ -111,9 +111,21 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.plans,
         builder: (context, state) => const PlanListScreen(),
       ),
+      // Static route must come BEFORE the parameterized sibling so GoRouter
+      // does not match the literal string "create" as a planId.
+      GoRoute(
+        path: AppRoutes.createPlan,
+        builder: (context, state) => const PlanFormScreen(planId: null),
+      ),
       GoRoute(
         path: AppRoutes.planDetail,
         builder: (context, state) => PlanDetailScreen(
+          planId: state.pathParameters['planId']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.editPlan,
+        builder: (context, state) => PlanFormScreen(
           planId: state.pathParameters['planId']!,
         ),
       ),

@@ -124,14 +124,14 @@ const reorderBodySchema = z.object({
 router.post('/', validate({ body: createPlanBodySchema }), plan.createPlan);
 router.get('/', validate({ query: listPlansQuerySchema }), plan.listPlans);
 router.get('/:id', validate({ params: planParamsSchema }), plan.getPlan);
-router.put('/:id', validate({ params: planParamsSchema, body: updatePlanBodySchema }), plan.updatePlan);
+router.patch('/:id', validate({ params: planParamsSchema, body: updatePlanBodySchema }), plan.updatePlan);
 router.delete('/:id', validate({ params: planParamsSchema }), plan.deletePlan);
 
 // Exercise sub-routes
 // NOTE: /reorder must be registered before /:planDayExId to avoid being caught as a param
 router.post('/:id/exercises', validate({ params: planParamsSchema, body: addExerciseBodySchema }), plan.addExercise);
-router.put('/:id/exercises/reorder', validate({ params: planParamsSchema, body: reorderBodySchema }), plan.reorderExercises);
-router.put('/:id/exercises/:planDayExId', validate({ params: planDayExParamsSchema, body: updateExerciseBodySchema }), plan.updateExercise);
+router.patch('/:id/exercises/reorder', validate({ params: planParamsSchema, body: reorderBodySchema }), plan.reorderExercises);
+router.patch('/:id/exercises/:planDayExId', validate({ params: planDayExParamsSchema, body: updateExerciseBodySchema }), plan.updateExercise);
 router.delete('/:id/exercises/:planDayExId', validate({ params: planDayExParamsSchema }), plan.removeExercise);
 
 export default router;

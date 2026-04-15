@@ -17,10 +17,10 @@ class PlanListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('My Plans'),
       ),
-      floatingActionButton: const FloatingActionButton(
-        tooltip: 'Coming soon',
-        onPressed: null,
-        child: Icon(Icons.add),
+      floatingActionButton: FloatingActionButton(
+        tooltip: 'Create plan',
+        onPressed: () => context.push(AppRoutes.createPlan),
+        child: const Icon(Icons.add),
       ),
       body: plansAsync.when(
         data: (plans) {

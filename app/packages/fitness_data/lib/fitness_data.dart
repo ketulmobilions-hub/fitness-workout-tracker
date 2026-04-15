@@ -9,6 +9,7 @@ export 'src/remote/exercise_api_client.dart';
 export 'src/remote/dtos/exercise_dtos.dart';
 export 'src/remote/plan_api_client.dart';
 export 'src/remote/dtos/plan_dtos.dart';
+export 'src/remote/dtos/plan_request_dtos.dart';
 
 // Local database
 export 'src/local/app_database.dart';
