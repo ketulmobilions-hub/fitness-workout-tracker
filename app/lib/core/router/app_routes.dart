@@ -20,9 +20,18 @@ abstract final class AppRoutes {
 
   // Workout plan routes
   static const plans = '/plans';
+
+  /// Static route — must be registered BEFORE [planDetail] so GoRouter does
+  /// not match the literal string "create" as a planId.
+  static const createPlan = '/plans/create';
+
   static const planDetail = '/plans/:planId';
+  static const editPlan = '/plans/:planId/edit';
 
   /// Returns the concrete path for navigating to a specific plan detail
   /// screen, e.g. `/plans/abc-123`.
   static String planDetailPath(String id) => '/plans/$id';
+
+  /// Returns the concrete path for navigating to the edit screen for a plan.
+  static String editPlanPath(String id) => '/plans/$id/edit';
 }
