@@ -302,6 +302,7 @@ model PersonalRecord {
   session  WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
 
   @@index([userId, exerciseId])
+  @@index([userId, exerciseId, recordType])
   @@map("personal_records")
 }
 
