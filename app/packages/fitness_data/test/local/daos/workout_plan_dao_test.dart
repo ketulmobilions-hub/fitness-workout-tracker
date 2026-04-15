@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:fitness_data/fitness_data.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_database.dart';

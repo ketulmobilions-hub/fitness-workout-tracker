@@ -17,4 +17,12 @@ abstract final class AppRoutes {
   /// Returns the concrete path for navigating to a specific exercise detail
   /// screen, e.g. `/exercises/abc-123`.
   static String exerciseDetailPath(String id) => '/exercises/$id';
+
+  // Workout plan routes
+  static const plans = '/plans';
+  static const planDetail = '/plans/:planId';
+
+  /// Returns the concrete path for navigating to a specific plan detail
+  /// screen, e.g. `/plans/abc-123`.
+  static String planDetailPath(String id) => '/plans/$id';
 }

@@ -1,0 +1,4 @@
+enum ScheduleType {
+  weekly,
+  recurring,
+}
