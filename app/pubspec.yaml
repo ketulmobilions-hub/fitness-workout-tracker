@@ -43,6 +43,7 @@ dependencies:
     path: packages/fitness_data
   fitness_domain:
     path: packages/fitness_domain
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:

@@ -34,4 +34,8 @@ abstract final class AppRoutes {
 
   /// Returns the concrete path for navigating to the edit screen for a plan.
   static String editPlanPath(String id) => '/plans/$id/edit';
+
+  // Active workout routes
+  static const activeWorkout = '/workout/active';
+  static const workoutSummary = '/workout/summary';
 }
