@@ -30,6 +30,187 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
         .map((row) => row == null ? null : _rowToSession(row));
   }
 
+  @override
+  Stream<List<WorkoutSessionSummary>> watchCompletedSessions() {
+    // Pure local DB stream. Sync is the caller's responsibility — triggered
+    // by the CompletedSessions StreamNotifier's _syncInBackground().
+    return _dao.watchCompletedSessions(_userId).asyncMap((rows) async {
+      if (rows.isEmpty) return [];
+
+      final ids = rows.map((r) => r.id).toList();
+      final planIds =
+          rows.map((r) => r.planId).whereType<String>().toSet().toList();
+
+      // 4 batch queries → constant overhead, not O(N).
+      // asyncMap on a single-subscriber Drift stream is sequential, so these
+      // never run concurrently with a subsequent emission.
+      final (exerciseCounts, totalSets, totalVolumes, planNames) = await (
+        _dao.getBatchExerciseCounts(ids),
+        _dao.getBatchTotalSets(ids),
+        _dao.getBatchTotalVolumes(ids),
+        _dao.getBatchPlanNames(planIds),
+      ).wait;
+
+      return rows.map((row) {
+        // Issue #9 fix: null-safe completedAt — a completed-status row with
+        // null completedAt (e.g. from a malformed server response) falls back
+        // to startedAt rather than throwing a Null check error.
+        final completedAt = row.completedAt ?? row.startedAt;
+        return WorkoutSessionSummary(
+          id: row.id,
+          // Issue #8 fix: convert to local time so calendar grouping matches
+          // what the user sees in the date display.
+          startedAt: row.startedAt.toLocal(),
+          completedAt: completedAt.toLocal(),
+          durationSec: row.durationSec ?? 0,
+          planId: row.planId,
+          // Issue #7 fix: plan name resolved here so cards don't need to watch
+          // the full plan list.
+          planName: row.planId != null ? planNames[row.planId] : null,
+          exerciseCount: exerciseCounts[row.id] ?? 0,
+          // Issue #4 fix: totalSets counts all sets (including warmup) so
+          // warmup-only sessions don't show "0 sets".
+          totalSets: totalSets[row.id] ?? 0,
+          totalVolumeKg: totalVolumes[row.id] ?? 0.0,
+        );
+      }).toList();
+    });
+  }
+
+  @override
+  Future<void> syncCompletedSessions() async {
+    // Issue #10 fix: cursor-based pagination so all pages are fetched, not
+    // just the first 50.
+    try {
+      String? cursor;
+      do {
+        final envelope = await _apiClient.listSessions(
+          status: 'completed',
+          limit: 50,
+          cursor: cursor,
+        );
+        for (final dto in envelope.data.sessions) {
+          await _dao.upsertSession(WorkoutSessionsCompanion(
+            id: Value(dto.id),
+            userId: Value(_userId),
+            planId: Value(dto.planId),
+            planDayId: Value(dto.planDayId),
+            startedAt: Value(DateTime.parse(dto.startedAt)),
+            completedAt: Value(dto.completedAt != null
+                ? DateTime.parse(dto.completedAt!)
+                : null),
+            durationSec: Value(dto.durationSec),
+            notes: Value(dto.notes),
+            status:
+                Value(const SessionStatusConverter().fromSql(dto.status)),
+            createdAt: Value(DateTime.parse(dto.createdAt)),
+            updatedAt: Value(DateTime.parse(dto.updatedAt)),
+          ));
+        }
+        cursor = envelope.data.pagination.hasMore
+            ? envelope.data.pagination.nextCursor
+            : null;
+      } while (cursor != null);
+    } catch (e) {
+      debugPrint(
+          'WorkoutSessionRepository: syncCompletedSessions failed: $e');
+    }
+  }
+
+  @override
+  Future<List<ExerciseLog>> getSessionExerciseLogs(String sessionId) async {
+    final logsWithNames = await _dao.getLogsWithNamesForSession(sessionId);
+
+    if (logsWithNames.isNotEmpty) {
+      return Future.wait(logsWithNames.map((entry) async {
+        final sets = await _dao.getSetsForExerciseLog(entry.log.id);
+        return ExerciseLog(
+          id: entry.log.id,
+          sessionId: sessionId,
+          exerciseId: entry.log.exerciseId,
+          exerciseName: entry.exerciseName,
+          sortOrder: entry.log.sortOrder,
+          notes: entry.log.notes,
+          sets: sets.map(_rowToSetLog).toList(),
+        );
+      }));
+    }
+
+    // Issue #5 fix: local DB has no exercise logs (session completed on
+    // another device). Fall back to the server's session detail endpoint.
+    debugPrint(
+        'WorkoutSessionRepository: no local exercise logs for $sessionId — fetching from server');
+    try {
+      final envelope = await _apiClient.getSession(sessionId);
+      final dto = envelope.data.session;
+
+      // Upsert exercise logs and set logs so subsequent opens are served
+      // from local DB without another network call.
+      for (final exerciseDto in dto.exercises) {
+        await _dao.upsertExerciseLog(ExerciseLogsCompanion(
+          id: Value(exerciseDto.id),
+          sessionId: Value(sessionId),
+          exerciseId: Value(exerciseDto.exerciseId),
+          sortOrder: Value(exerciseDto.sortOrder),
+          notes: Value(exerciseDto.notes),
+        ));
+        for (final setDto in exerciseDto.sets) {
+          await _dao.upsertSetLog(SetLogsCompanion(
+            id: Value(setDto.id),
+            exerciseLogId: Value(exerciseDto.id),
+            setNumber: Value(setDto.setNumber),
+            reps: Value(setDto.reps),
+            weightKg: Value(setDto.weightKg),
+            durationSec: Value(setDto.durationSec),
+            distanceM: Value(setDto.distanceM),
+            paceSecPerKm: Value(setDto.paceSecPerKm),
+            heartRate: Value(setDto.heartRate),
+            rpe: Value(setDto.rpe),
+            tempo: Value(setDto.tempo),
+            isWarmup: Value(setDto.isWarmup),
+            completedAt: Value(setDto.completedAt != null
+                ? DateTime.parse(setDto.completedAt!)
+                : null),
+          ));
+        }
+      }
+
+      // Return domain models directly from the DTO (exercise names are
+      // available in the DTO even if exercises aren't yet in local DB).
+      return dto.exercises.map((exerciseDto) => ExerciseLog(
+            id: exerciseDto.id,
+            sessionId: sessionId,
+            exerciseId: exerciseDto.exerciseId,
+            exerciseName: exerciseDto.exerciseName,
+            sortOrder: exerciseDto.sortOrder,
+            notes: exerciseDto.notes,
+            sets: exerciseDto.sets
+                .map((setDto) => SetLog(
+                      id: setDto.id,
+                      exerciseLogId: exerciseDto.id,
+                      setNumber: setDto.setNumber,
+                      reps: setDto.reps,
+                      weightKg: setDto.weightKg,
+                      durationSec: setDto.durationSec,
+                      distanceM: setDto.distanceM,
+                      paceSecPerKm: setDto.paceSecPerKm,
+                      heartRate: setDto.heartRate,
+                      rpe: setDto.rpe,
+                      tempo: setDto.tempo,
+                      isWarmup: setDto.isWarmup,
+                      completedAt: setDto.completedAt != null
+                          ? DateTime.parse(setDto.completedAt!)
+                          : null,
+                    ))
+                .toList(),
+          )).toList();
+    } catch (e) {
+      debugPrint(
+          'WorkoutSessionRepository: getSessionExerciseLogs server fallback failed: $e');
+      return [];
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Write — session lifecycle
   // ---------------------------------------------------------------------------
