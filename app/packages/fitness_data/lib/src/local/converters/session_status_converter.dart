@@ -1,11 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 
-enum SessionStatus {
-  inProgress,
-  completed,
-  abandoned,
-}
+// Re-export so existing code that imports this file still gets SessionStatus.
+export 'package:fitness_domain/fitness_domain.dart' show SessionStatus;
 
 class SessionStatusConverter extends TypeConverter<SessionStatus, String> {
   const SessionStatusConverter();
@@ -20,8 +18,10 @@ class SessionStatusConverter extends TypeConverter<SessionStatus, String> {
       case 'abandoned':
         return SessionStatus.abandoned;
       default:
-        debugPrint('SessionStatusConverter: unknown value "$fromDb", falling back to abandoned');
-        return SessionStatus.abandoned;
+        // Fall back to inProgress — safer than abandoned since an inProgress
+        // session can still be resumed. Corrected on next full sync.
+        debugPrint('SessionStatusConverter: unknown value "$fromDb", falling back to inProgress');
+        return SessionStatus.inProgress;
     }
   }
 

@@ -4,17 +4,66 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../active_session/providers/active_session_notifier.dart';
 import '../../providers/plan_detail_provider.dart';
 import '../widgets/plan_day_section.dart';
 
-class PlanDetailScreen extends ConsumerWidget {
+class PlanDetailScreen extends ConsumerStatefulWidget {
   const PlanDetailScreen({super.key, required this.planId});
 
   final String planId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final planAsync = ref.watch(planDetailProvider(planId));
+  ConsumerState<PlanDetailScreen> createState() => _PlanDetailScreenState();
+}
+
+class _PlanDetailScreenState extends ConsumerState<PlanDetailScreen> {
+  bool _isStartingSession = false;
+
+  Future<void> _onStartWorkout(WorkoutPlan plan) async {
+    if (_isStartingSession) return;
+
+    PlanDay? selectedDay;
+
+    if (plan.days.isEmpty) {
+      // Free workout — no plan day selected.
+      selectedDay = null;
+    } else if (plan.days.length == 1) {
+      selectedDay = plan.days.first;
+    } else {
+      // Let the user pick which day to do.
+      selectedDay = await showModalBottomSheet<PlanDay>(
+        context: context,
+        builder: (ctx) => _DayPickerSheet(days: plan.days),
+      );
+      if (selectedDay == null || !mounted) return;
+    }
+
+    setState(() => _isStartingSession = true);
+    try {
+      await ref.read(activeSessionProvider.notifier).startSession(
+            planId: plan.id,
+            planDayId: selectedDay?.id,
+            exercises: selectedDay?.exercises ?? [],
+          );
+      if (!mounted) return;
+      context.push(AppRoutes.activeWorkout);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not start workout: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isStartingSession = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final planAsync = ref.watch(planDetailProvider(widget.planId));
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +75,8 @@ class PlanDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit plan',
-            onPressed: () => context.push(AppRoutes.editPlanPath(planId)),
+            onPressed: () =>
+                context.push(AppRoutes.editPlanPath(widget.planId)),
           ),
         ],
       ),
@@ -49,8 +99,9 @@ class PlanDetailScreen extends ConsumerWidget {
                 TextButton.icon(
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry'),
-                  onPressed: () =>
-                      ref.read(planDetailProvider(planId).notifier).refresh(),
+                  onPressed: () => ref
+                      .read(planDetailProvider(widget.planId).notifier)
+                      .refresh(),
                 ),
               ],
             ),
@@ -66,13 +117,84 @@ class PlanDetailScreen extends ConsumerWidget {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: FilledButton.icon(
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Start Workout'),
-            // Workout logging is a future issue — disabled for now.
-            onPressed: null,
+          child: planAsync.maybeWhen(
+            data: (plan) => FilledButton.icon(
+              icon: _isStartingSession
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.play_arrow),
+              label: const Text('Start Workout'),
+              onPressed: _isStartingSession || plan == null
+                  ? null
+                  : () => _onStartWorkout(plan),
+            ),
+            orElse: () => FilledButton.icon(
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Start Workout'),
+              onPressed: null,
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet for selecting which plan day to start.
+class _DayPickerSheet extends StatelessWidget {
+  const _DayPickerSheet({required this.days});
+
+  final List<PlanDay> days;
+
+  static const _dayNames = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  String _dayLabel(PlanDay day) {
+    if (day.name != null && day.name!.isNotEmpty) return day.name!;
+    if (day.dayOfWeek >= 1 && day.dayOfWeek <= 7) {
+      return _dayNames[day.dayOfWeek - 1];
+    }
+    return 'Day ${day.sortOrder + 1}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              'Select workout day',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          ...days.map(
+            (day) => ListTile(
+              title: Text(_dayLabel(day)),
+              subtitle: day.exercises.isNotEmpty
+                  ? Text(
+                      '${day.exercises.length} exercise${day.exercises.length == 1 ? '' : 's'}')
+                  : null,
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).pop(day),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

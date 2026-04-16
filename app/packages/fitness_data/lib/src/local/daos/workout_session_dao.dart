@@ -89,4 +89,87 @@ class WorkoutSessionDao extends DatabaseAccessor<AppDatabase>
   Future<int> deleteSetLog(String id) {
     return (delete(setLogs)..where((t) => t.id.equals(id))).go();
   }
+
+  // Future-based point lookups (no stream overhead, no race from .first)
+
+  /// Returns a single session by [id], or null if not found.
+  Future<WorkoutSessionRow?> getSession(String id) {
+    return (select(workoutSessions)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  /// Returns all exercise logs for [sessionId] as a one-shot Future.
+  ///
+  /// Use this instead of `watchLogsForSession(sessionId).first` to avoid
+  /// opening and immediately tearing down a reactive DB subscription on every
+  /// call.
+  Future<List<ExerciseLogRow>> getLogsForSession(String sessionId) {
+    return (select(exerciseLogs)
+          ..where((t) => t.sessionId.equals(sessionId))
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+  }
+
+  /// Returns the exercise log for a given (session, exercise) pair, or null.
+  ///
+  /// Used by `logSet` to find-or-create an exercise log without opening a
+  /// reactive stream subscription.
+  Future<ExerciseLogRow?> getExerciseLogForSessionAndExercise(
+      String sessionId, String exerciseId) {
+    return (select(exerciseLogs)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.exerciseId.equals(exerciseId)))
+        .getSingleOrNull();
+  }
+
+  /// Returns the set logs from the most recent completed session in which
+  /// [exerciseId] was performed by [userId].
+  ///
+  /// Pass [excludeSessionId] (the current in-progress session) to ensure the
+  /// current session's own sets are never returned as "previous" performance.
+  Future<List<SetLogRow>> getPreviousSetsForExercise({
+    required String userId,
+    required String exerciseId,
+    String? excludeSessionId,
+  }) async {
+    // Step 1 — find the most recent completed session that logged this exercise.
+    final sessionQuery = select(workoutSessions).join([
+      innerJoin(
+        exerciseLogs,
+        exerciseLogs.sessionId.equalsExp(workoutSessions.id),
+      ),
+    ])
+      ..addColumns([workoutSessions.id])
+      ..where(workoutSessions.userId.equals(userId))
+      ..where(exerciseLogs.exerciseId.equals(exerciseId))
+      ..where(workoutSessions.status.equals(
+        const SessionStatusConverter().toSql(SessionStatus.completed),
+      ))
+      ..orderBy([OrderingTerm.desc(workoutSessions.startedAt)])
+      ..limit(1);
+
+    if (excludeSessionId != null) {
+      sessionQuery.where(workoutSessions.id.equals(excludeSessionId).not());
+    }
+
+    final sessionRows = await sessionQuery.get();
+    if (sessionRows.isEmpty) return [];
+
+    final sessionId = sessionRows.first.readTable(workoutSessions).id;
+
+    // Step 2 — find the exercise log for that session + exercise.
+    final logRow = await (select(exerciseLogs)
+          ..where((t) =>
+              t.sessionId.equals(sessionId) &
+              t.exerciseId.equals(exerciseId)))
+        .getSingleOrNull();
+    if (logRow == null) return [];
+
+    // Step 3 — return all sets for that exercise log, ordered by set number.
+    return (select(setLogs)
+          ..where((t) => t.exerciseLogId.equals(logRow.id))
+          ..orderBy([(t) => OrderingTerm.asc(t.setNumber)]))
+        .get();
+  }
 }
