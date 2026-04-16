@@ -7,9 +7,13 @@ class PreviousPerformanceCard extends StatelessWidget {
   const PreviousPerformanceCard({
     super.key,
     required this.previousSets,
+    required this.exerciseType,
   });
 
   final List<SetLog> previousSets;
+  // Fix #12: exercise type drives the chip format — avoids field-presence
+  // heuristics that misclassify e.g. a timed plank (no weight/reps) as cardio.
+  final ExerciseType exerciseType;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +55,10 @@ class PreviousPerformanceCard extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 4,
-            children: previousSets.map((set) => _SetChip(set: set)).toList(),
+            children: previousSets
+                .map((set) =>
+                    _SetChip(set: set, exerciseType: exerciseType))
+                .toList(),
           ),
         ],
       ),
@@ -60,20 +67,34 @@ class PreviousPerformanceCard extends StatelessWidget {
 }
 
 class _SetChip extends StatelessWidget {
-  const _SetChip({required this.set});
+  const _SetChip({required this.set, required this.exerciseType});
 
   final SetLog set;
+  final ExerciseType exerciseType;
 
   String _label() {
+    if (exerciseType != ExerciseType.strength) {
+      // Cardio / stretching: distance · duration
+      final parts = <String>[];
+      if (set.distanceM != null) {
+        final km = set.distanceM! / 1000;
+        parts.add('${km.toStringAsFixed(2)} km');
+      }
+      if (set.durationSec != null) {
+        final mins = set.durationSec! ~/ 60;
+        final secs = set.durationSec! % 60;
+        parts.add('$mins:${secs.toString().padLeft(2, '0')}');
+      }
+      return parts.isEmpty ? 'Set ${set.setNumber}' : parts.join(' · ');
+    }
+
+    // Strength: weight × reps
     final parts = <String>[];
     if (set.weightKg != null) {
       final w = set.weightKg!;
       parts.add(w == w.truncateToDouble() ? '${w.toInt()} kg' : '$w kg');
     }
     if (set.reps != null) parts.add('× ${set.reps}');
-    if (parts.isEmpty && set.durationSec != null) {
-      parts.add('${set.durationSec}s');
-    }
     return parts.isEmpty ? 'Set ${set.setNumber}' : parts.join(' ');
   }
 

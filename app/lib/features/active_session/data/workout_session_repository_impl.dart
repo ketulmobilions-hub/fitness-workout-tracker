@@ -105,6 +105,10 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     required int setNumber,
     int? reps,
     double? weightKg,
+    int? durationSec,
+    double? distanceM,
+    double? paceSecPerKm,
+    int? heartRate,
     int? rpe,
     String? tempo,
     bool isWarmup = false,
@@ -143,6 +147,10 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       setNumber: Value(setNumber),
       reps: Value(reps),
       weightKg: Value(weightKg),
+      durationSec: Value(durationSec),
+      distanceM: Value(distanceM),
+      paceSecPerKm: Value(paceSecPerKm),
+      heartRate: Value(heartRate),
       rpe: Value(rpe),
       tempo: Value(tempo),
       isWarmup: Value(isWarmup),
@@ -159,6 +167,10 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
           setNumber: setNumber,
           reps: reps,
           weightKg: weightKg,
+          durationSec: durationSec,
+          distanceM: distanceM,
+          paceSecPerKm: paceSecPerKm,
+          heartRate: heartRate,
           rpe: rpe,
           tempo: tempo,
           isWarmup: isWarmup,
@@ -178,6 +190,10 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
           setNumber: Value(setNumber),
           reps: Value(reps),
           weightKg: Value(weightKg),
+          durationSec: Value(durationSec),
+          distanceM: Value(distanceM),
+          paceSecPerKm: Value(paceSecPerKm),
+          heartRate: Value(heartRate),
           rpe: Value(rpe),
           tempo: Value(tempo),
           isWarmup: Value(isWarmup),
@@ -195,6 +211,10 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       setNumber: setNumber,
       reps: reps,
       weightKg: weightKg,
+      durationSec: durationSec,
+      distanceM: distanceM,
+      paceSecPerKm: paceSecPerKm,
+      heartRate: heartRate,
       rpe: rpe,
       tempo: tempo,
       isWarmup: isWarmup,
@@ -294,6 +314,17 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
 
   @override
   Future<void> abandonSession(String sessionId) async {
+    // Fix #9: write locally first (offline-first pattern) so the session is
+    // always marked abandoned in Drift regardless of network state. Without
+    // this, a Drift error after a successful server call leaves the two stores
+    // permanently out of sync — watchActiveSession() would keep surfacing the
+    // "Resume workout?" prompt for a session the server has already closed.
+    await _dao.upsertSession(WorkoutSessionsCompanion(
+      id: Value(sessionId),
+      status: const Value(SessionStatus.abandoned),
+      updatedAt: Value(DateTime.now()),
+    ));
+
     try {
       await _apiClient.updateSession(
         sessionId,
@@ -303,12 +334,6 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       debugPrint(
           'WorkoutSessionRepository: abandonSession server sync failed: $e');
     }
-
-    await _dao.upsertSession(WorkoutSessionsCompanion(
-      id: Value(sessionId),
-      status: const Value(SessionStatus.abandoned),
-      updatedAt: Value(DateTime.now()),
-    ));
   }
 
   @override

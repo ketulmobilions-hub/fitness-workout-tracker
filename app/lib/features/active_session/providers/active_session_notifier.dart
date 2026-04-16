@@ -203,6 +203,9 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
   Future<SetLog?> logSet({
     int? reps,
     double? weightKg,
+    int? durationSec,
+    double? distanceM,
+    int? heartRate,
     int? rpe,
     String? tempo,
     bool isWarmup = false,
@@ -217,12 +220,22 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
       final nextSetNumber = currentEx.loggedSets.length + 1;
       final completedAt = DateTime.now();
 
+      // Auto-calculate pace when both duration and distance are present.
+      final paceSecPerKm =
+          (durationSec != null && distanceM != null && distanceM > 0)
+              ? durationSec / (distanceM / 1000)
+              : null;
+
       final setLog = await ref.read(workoutSessionRepositoryProvider).logSet(
             sessionId: current.session.id,
             exerciseId: currentEx.planExercise.exerciseId,
             setNumber: nextSetNumber,
             reps: reps,
             weightKg: weightKg,
+            durationSec: durationSec,
+            distanceM: distanceM,
+            paceSecPerKm: paceSecPerKm,
+            heartRate: heartRate,
             rpe: rpe,
             tempo: tempo,
             isWarmup: isWarmup,

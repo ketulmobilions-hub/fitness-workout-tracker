@@ -7,13 +7,42 @@ class LoggedSetTile extends StatelessWidget {
   const LoggedSetTile({
     super.key,
     required this.set,
+    required this.exerciseType,
     required this.onDelete,
   });
 
   final SetLog set;
-  final VoidCallback onDelete;
+  // Fix #12: exercise type drives the display format rather than relying on
+  // which fields happen to be populated (field-presence heuristic).
+  final ExerciseType exerciseType;
+  // Fix #6: async callback so confirmDismiss can await the delete and keep
+  // the tile visible on failure rather than silently disappearing.
+  final Future<void> Function() onDelete;
 
   String _summary() {
+    if (exerciseType != ExerciseType.strength) {
+      // Cardio / stretching: distance · duration · pace · HR
+      final parts = <String>[];
+      if (set.distanceM != null) {
+        final km = set.distanceM! / 1000;
+        parts.add('${km.toStringAsFixed(2)} km');
+      }
+      if (set.durationSec != null) {
+        final mins = set.durationSec! ~/ 60;
+        final secs = set.durationSec! % 60;
+        parts.add('$mins:${secs.toString().padLeft(2, '0')}');
+      }
+      if (set.paceSecPerKm != null) {
+        final paceMin = set.paceSecPerKm! ~/ 60;
+        final paceSec = (set.paceSecPerKm! % 60).round();
+        parts.add('$paceMin:${paceSec.toString().padLeft(2, '0')}/km');
+      }
+      if (set.heartRate != null) parts.add('HR ${set.heartRate}');
+      if (set.rpe != null) parts.add('RPE ${set.rpe}');
+      return parts.isEmpty ? '—' : parts.join('  ·  ');
+    }
+
+    // Strength: weight × reps, RPE, tempo
     final parts = <String>[];
     if (set.weightKg != null) {
       final w = set.weightKg!;
@@ -40,7 +69,26 @@ class LoggedSetTile extends StatelessWidget {
         child: Icon(Icons.delete_outline,
             color: theme.colorScheme.onErrorContainer),
       ),
-      onDismissed: (_) => onDelete(),
+      // Fix #6: await the async delete before confirming dismissal. If the
+      // delete fails, return false so the tile snaps back and the user sees
+      // an error — prevents "ghost sets" reappearing from a failed DB write.
+      confirmDismiss: (_) async {
+        // Capture messenger before the await to avoid using BuildContext
+        // across an async gap (use_build_context_synchronously).
+        final messenger = ScaffoldMessenger.of(context);
+        try {
+          await onDelete();
+          return true;
+        } catch (e) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete set: $e'),
+              backgroundColor: theme.colorScheme.error,
+            ),
+          );
+          return false;
+        }
+      },
       child: ListTile(
         dense: true,
         leading: Container(
