@@ -84,9 +84,10 @@ class HomeScreen extends ConsumerWidget {
                 onPressed: () => context.push(AppRoutes.plans),
               ),
               const SizedBox(height: 12),
-              Text(
-                'More workout features coming soon.',
-                style: Theme.of(context).textTheme.bodyMedium,
+              ElevatedButton.icon(
+                icon: const Icon(Icons.history),
+                label: const Text('Workout History'),
+                onPressed: () => context.push(AppRoutes.workoutHistory),
               ),
             ],
           ),

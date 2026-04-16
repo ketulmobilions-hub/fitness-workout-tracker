@@ -2,11 +2,14 @@ import 'package:drift/drift.dart';
 
 import '../app_database.dart';
 import '../converters/session_status_converter.dart';
+import '../tables/exercise_library_tables.dart';
+import '../tables/workout_plan_tables.dart';
 import '../tables/workout_session_tables.dart';
 
 part 'workout_session_dao.g.dart';
 
-@DriftAccessor(tables: [WorkoutSessions, ExerciseLogs, SetLogs])
+@DriftAccessor(
+    tables: [WorkoutSessions, ExerciseLogs, SetLogs, Exercises, WorkoutPlans])
 class WorkoutSessionDao extends DatabaseAccessor<AppDatabase>
     with _$WorkoutSessionDaoMixin {
   WorkoutSessionDao(super.db);
@@ -123,7 +126,156 @@ class WorkoutSessionDao extends DatabaseAccessor<AppDatabase>
         .getSingleOrNull();
   }
 
-  /// Returns the set logs from the most recent completed session in which
+  // History queries
+
+  /// Streams all completed sessions for [userId], ordered newest first.
+  Stream<List<WorkoutSessionRow>> watchCompletedSessions(String userId) {
+    return (select(workoutSessions)
+          ..where((t) =>
+              t.userId.equals(userId) &
+              t.status.equals(
+                const SessionStatusConverter().toSql(SessionStatus.completed),
+              ))
+          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
+        .watch();
+  }
+
+  /// Returns exercise counts keyed by session ID for all [sessionIds].
+  /// One query for all sessions — avoids N+1 pattern.
+  Future<Map<String, int>> getBatchExerciseCounts(
+      List<String> sessionIds) async {
+    if (sessionIds.isEmpty) return {};
+    final rows = await (select(exerciseLogs)
+          ..where((t) => t.sessionId.isIn(sessionIds)))
+        .get();
+    final counts = <String, int>{};
+    for (final row in rows) {
+      counts[row.sessionId] = (counts[row.sessionId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Returns total set counts (all sets, including warmup) keyed by session ID
+  /// for all [sessionIds]. One query for all sessions — avoids N+1 pattern.
+  Future<Map<String, int>> getBatchTotalSets(List<String> sessionIds) async {
+    if (sessionIds.isEmpty) return {};
+    final query = select(setLogs).join([
+      innerJoin(
+          exerciseLogs, exerciseLogs.id.equalsExp(setLogs.exerciseLogId)),
+    ])
+      ..where(exerciseLogs.sessionId.isIn(sessionIds));
+    final rows = await query.get();
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final sessionId = row.readTable(exerciseLogs).sessionId;
+      counts[sessionId] = (counts[sessionId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /// Returns total volume (sum of reps × weightKg, non-warmup strength sets)
+  /// keyed by session ID for all [sessionIds]. One query — avoids N+1 pattern.
+  Future<Map<String, double>> getBatchTotalVolumes(
+      List<String> sessionIds) async {
+    if (sessionIds.isEmpty) return {};
+    final query = select(setLogs).join([
+      innerJoin(
+          exerciseLogs, exerciseLogs.id.equalsExp(setLogs.exerciseLogId)),
+    ])
+      ..where(exerciseLogs.sessionId.isIn(sessionIds))
+      ..where(setLogs.isWarmup.equals(false))
+      ..where(setLogs.reps.isNotNull())
+      ..where(setLogs.weightKg.isNotNull());
+    final rows = await query.get();
+    final volumes = <String, double>{};
+    for (final row in rows) {
+      final setRow = row.readTable(setLogs);
+      final sessionId = row.readTable(exerciseLogs).sessionId;
+      volumes[sessionId] =
+          (volumes[sessionId] ?? 0.0) + (setRow.reps! * setRow.weightKg!);
+    }
+    return volumes;
+  }
+
+  /// Returns plan name strings keyed by plan ID for all [planIds].
+  /// One query for all plans — avoids N+1 pattern.
+  Future<Map<String, String>> getBatchPlanNames(List<String> planIds) async {
+    if (planIds.isEmpty) return {};
+    final rows = await (select(workoutPlans)
+          ..where((t) => t.id.isIn(planIds)))
+        .get();
+    return {for (final row in rows) row.id: row.name};
+  }
+
+  /// Returns the total lifted volume (sum of reps × weightKg) for all
+  /// non-warmup strength sets in [sessionId].
+  Future<double> getTotalVolumeForSession(String sessionId) async {
+    final query = customSelect(
+      '''
+      SELECT COALESCE(SUM(sl.reps * sl.weight_kg), 0.0) AS total_volume
+      FROM set_logs sl
+      INNER JOIN exercise_logs el ON sl.exercise_log_id = el.id
+      WHERE el.session_id = ? AND sl.is_warmup = 0
+        AND sl.reps IS NOT NULL AND sl.weight_kg IS NOT NULL
+      ''',
+      variables: [Variable.withString(sessionId)],
+      readsFrom: {setLogs, exerciseLogs},
+    );
+    final result = await query.getSingleOrNull();
+    if (result == null) return 0.0;
+    return (result.data['total_volume'] as num).toDouble();
+  }
+
+  /// Returns the total number of sets logged for [sessionId].
+  Future<int> getTotalSetsForSession(String sessionId) async {
+    final query = customSelect(
+      '''
+      SELECT COUNT(*) AS total_sets
+      FROM set_logs sl
+      INNER JOIN exercise_logs el ON sl.exercise_log_id = el.id
+      WHERE el.session_id = ?
+      ''',
+      variables: [Variable.withString(sessionId)],
+      readsFrom: {setLogs, exerciseLogs},
+    );
+    final result = await query.getSingleOrNull();
+    if (result == null) return 0;
+    // Use (as num).toInt() — SQLite may return numeric results as double
+    // on iOS even for COUNT(*), which would throw with a direct `as int` cast.
+    return (result.data['total_sets'] as num).toInt();
+  }
+
+  /// Returns exercise logs for [sessionId] with exercise names resolved by
+  /// joining with the exercises table. Ordered by sort_order.
+  Future<List<({ExerciseLogRow log, String exerciseName, String exerciseType})>>
+      getLogsWithNamesForSession(String sessionId) async {
+    final query = select(exerciseLogs).join([
+      innerJoin(exercises, exercises.id.equalsExp(exerciseLogs.exerciseId)),
+    ])
+      ..where(exerciseLogs.sessionId.equals(sessionId))
+      ..orderBy([OrderingTerm.asc(exerciseLogs.sortOrder)]);
+
+    final rows = await query.get();
+    return rows.map((row) {
+      final log = row.readTable(exerciseLogs);
+      final exercise = row.readTable(exercises);
+      return (
+        log: log,
+        exerciseName: exercise.name,
+        exerciseType: exercise.exerciseType.name,
+      );
+    }).toList();
+  }
+
+  /// Returns all set logs for [exerciseLogId] ordered by set number.
+  Future<List<SetLogRow>> getSetsForExerciseLog(String exerciseLogId) {
+    return (select(setLogs)
+          ..where((t) => t.exerciseLogId.equals(exerciseLogId))
+          ..orderBy([(t) => OrderingTerm.asc(t.setNumber)]))
+        .get();
+  }
+
+  /// Returns the most recent completed session in which
   /// [exerciseId] was performed by [userId].
   ///
   /// Pass [excludeSessionId] (the current in-progress session) to ensure the

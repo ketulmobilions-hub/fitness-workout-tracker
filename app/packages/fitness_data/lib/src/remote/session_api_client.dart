@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
 
 import 'dtos/session_dtos.dart';
+import 'dtos/session_list_dto.dart';
 import 'dtos/session_request_dtos.dart';
 
 part 'session_api_client.g.dart';
@@ -13,6 +14,15 @@ abstract class SessionApiClient {
   // -------------------------------------------------------------------------
   // Session lifecycle
   // -------------------------------------------------------------------------
+
+  @GET('/api/v1/sessions')
+  Future<SessionListEnvelopeDto> listSessions({
+    @Query('status') String? status,
+    @Query('cursor') String? cursor,
+    @Query('limit') int? limit,
+    @Query('from') String? from,
+    @Query('to') String? to,
+  });
 
   @POST('/api/v1/sessions')
   Future<SessionDetailEnvelopeDto> startSession(

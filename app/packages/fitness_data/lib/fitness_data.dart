@@ -12,6 +12,7 @@ export 'src/remote/dtos/plan_dtos.dart';
 export 'src/remote/dtos/plan_request_dtos.dart';
 export 'src/remote/session_api_client.dart';
 export 'src/remote/dtos/session_dtos.dart';
+export 'src/remote/dtos/session_list_dto.dart';
 export 'src/remote/dtos/session_request_dtos.dart';
 
 // Local database

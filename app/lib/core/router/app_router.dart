@@ -14,6 +14,7 @@ import '../../features/exercises/presentation/screens/create_exercise_screen.dar
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import '../../features/active_session/active_session.dart';
+import '../../features/workout_history/workout_history.dart';
 import '../../features/workout_plans/workout_plans.dart';
 import 'app_routes.dart';
 
@@ -140,6 +141,19 @@ GoRouter appRouter(Ref ref) {
           final summary = state.extra as WorkoutSummary;
           return WorkoutSummaryScreen(summary: summary);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.workoutHistory,
+        builder: (context, state) => const WorkoutHistoryScreen(),
+      ),
+      // GoRouter matches sibling routes by path specificity, not declaration
+      // order. /history and /history/:sessionId are unambiguous as siblings —
+      // no special ordering requirement here (unlike parent/child nesting).
+      GoRoute(
+        path: AppRoutes.sessionDetail,
+        builder: (context, state) => SessionDetailScreen(
+          sessionId: state.pathParameters['sessionId']!,
+        ),
       ),
     ],
   );

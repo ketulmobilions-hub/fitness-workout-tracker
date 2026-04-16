@@ -1,4 +1,5 @@
 import 'workout_session.dart';
+import 'workout_session_summary.dart';
 
 abstract class WorkoutSessionRepository {
   /// Creates a new workout session. Writes to local DB and syncs to the server.
@@ -55,6 +56,20 @@ abstract class WorkoutSessionRepository {
     required String exerciseId,
     String? excludeSessionId,
   });
+
+  /// Streams summary data for all completed sessions, newest first.
+  /// Uses local DB for offline-first reactivity. The caller is responsible
+  /// for triggering server sync via [syncCompletedSessions].
+  Stream<List<WorkoutSessionSummary>> watchCompletedSessions();
+
+  /// Fetches completed sessions from the server and upserts any missing rows
+  /// into the local DB, using cursor-based pagination to cover all pages.
+  Future<void> syncCompletedSessions();
+
+  /// Returns the exercise logs (with nested sets) for a single completed
+  /// session. Reads from local DB first; falls back to the server if no
+  /// local exercise data exists (e.g. session completed on another device).
+  Future<List<ExerciseLog>> getSessionExerciseLogs(String sessionId);
 }
 
 class SessionCompletionResult {

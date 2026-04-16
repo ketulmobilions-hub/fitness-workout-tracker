@@ -38,4 +38,12 @@ abstract final class AppRoutes {
   // Active workout routes
   static const activeWorkout = '/workout/active';
   static const workoutSummary = '/workout/summary';
+
+  // Workout history routes
+  static const workoutHistory = '/history';
+  static const sessionDetail = '/history/:sessionId';
+
+  /// Returns the concrete path for navigating to a specific session detail
+  /// screen, e.g. `/history/abc-123`.
+  static String sessionDetailPath(String id) => '/history/$id';
 }

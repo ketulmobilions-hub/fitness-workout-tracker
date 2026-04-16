@@ -15,4 +15,5 @@ export 'src/workout_plans/workout_plan_repository.dart';
 
 export 'src/workout_sessions/session_status.dart';
 export 'src/workout_sessions/workout_session.dart';
+export 'src/workout_sessions/workout_session_summary.dart';
 export 'src/workout_sessions/workout_session_repository.dart';
