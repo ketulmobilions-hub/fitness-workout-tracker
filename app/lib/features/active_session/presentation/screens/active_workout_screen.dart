@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../workout_plans/workout_plans.dart';
 import '../../providers/active_session_notifier.dart';
+import '../widgets/cardio_set_input.dart';
 import '../widgets/previous_performance_card.dart';
 import '../widgets/set_log_tile.dart';
 import '../widgets/workout_timer.dart';
@@ -62,6 +63,9 @@ class _ActiveWorkoutBodyState extends ConsumerState<_ActiveWorkoutBody> {
     int? rpe,
     String? tempo,
     bool isWarmup = false,
+    int? durationSec,
+    double? distanceM,
+    int? heartRate,
   }) async {
     try {
       await ref.read(activeSessionProvider.notifier).logSet(
@@ -70,6 +74,9 @@ class _ActiveWorkoutBodyState extends ConsumerState<_ActiveWorkoutBody> {
             rpe: rpe,
             tempo: tempo,
             isWarmup: isWarmup,
+            durationSec: durationSec,
+            distanceM: distanceM,
+            heartRate: heartRate,
           );
     } catch (e) {
       if (!mounted) return;
@@ -82,6 +89,8 @@ class _ActiveWorkoutBodyState extends ConsumerState<_ActiveWorkoutBody> {
     }
   }
 
+  // Fix #6: returns Future<void> so LoggedSetTile.confirmDismiss can await it
+  // and snap the tile back on failure instead of silently swallowing the error.
   Future<void> _deleteSet(SetLog setLog) async {
     await ref.read(activeSessionProvider.notifier).deleteSet(setLog);
   }
@@ -354,8 +363,11 @@ class _ExerciseLogger extends StatelessWidget {
     int? rpe,
     String? tempo,
     bool isWarmup,
+    int? durationSec,
+    double? distanceM,
+    int? heartRate,
   }) onLogSet;
-  final void Function(SetLog) onDeleteSet;
+  final Future<void> Function(SetLog) onDeleteSet;
 
   @override
   Widget build(BuildContext context) {
@@ -365,6 +377,18 @@ class _ExerciseLogger extends StatelessWidget {
     final nextSetNumber = loggedSets.length + 1;
 
     final lastSet = loggedSets.isNotEmpty ? loggedSets.last : null;
+    // Fix #11: stretching exercises are also duration-based — only strength
+    // uses the weight × reps form.
+    final bool useDurationInput = ex.exerciseType != ExerciseType.strength;
+    final targetLabel = _targetLabel(ex);
+
+    // Fix #7: for the first set in a session, pre-fill from the previous
+    // session's reference sets so the user can see a concrete starting point.
+    // For subsequent sets, use the most recently logged set in this session.
+    final prevRef = lastSet ??
+        (exerciseData.previousSets.isNotEmpty
+            ? exerciseData.previousSets.first
+            : null);
 
     return CustomScrollView(
       slivers: [
@@ -388,11 +412,11 @@ class _ExerciseLogger extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (ex.targetSets != null || ex.targetReps != null)
+                if (targetLabel != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      _targetLabel(ex),
+                      targetLabel,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -416,8 +440,10 @@ class _ExerciseLogger extends StatelessWidget {
 
         // Previous performance
         SliverToBoxAdapter(
-          child:
-              PreviousPerformanceCard(previousSets: exerciseData.previousSets),
+          child: PreviousPerformanceCard(
+            previousSets: exerciseData.previousSets,
+            exerciseType: ex.exerciseType,
+          ),
         ),
 
         // Logged sets
@@ -428,6 +454,7 @@ class _ExerciseLogger extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (_, i) => LoggedSetTile(
                   set: loggedSets[i],
+                  exerciseType: ex.exerciseType,
                   onDelete: () => onDeleteSet(loggedSets[i]),
                 ),
                 childCount: loggedSets.length,
@@ -435,44 +462,79 @@ class _ExerciseLogger extends StatelessWidget {
             ),
           ),
 
-        // New set input
+        // New set input — dispatch by exercise type
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 16),
-            child: SetInputRow(
-              setNumber: nextSetNumber,
-              previousWeight: lastSet?.weightKg,
-              previousReps: lastSet?.reps,
-              targetReps: ex.targetReps,
-              targetSets: ex.targetSets,
-              onLog: ({
-                int? reps,
-                double? weightKg,
-                int? rpe,
-                String? tempo,
-                bool isWarmup = false,
-              }) =>
-                  onLogSet(
-                reps: reps,
-                weightKg: weightKg,
-                rpe: rpe,
-                tempo: tempo,
-                isWarmup: isWarmup,
-              ),
-            ),
+            child: useDurationInput
+                ? CardioSetInputRow(
+                    setNumber: nextSetNumber,
+                    previousDurationSec: prevRef?.durationSec,
+                    previousDistanceM: prevRef?.distanceM,
+                    targetDurationSec: ex.targetDurationSec,
+                    targetDistanceM: ex.targetDistanceM,
+                    onLog: ({
+                      int? durationSec,
+                      double? distanceM,
+                      int? heartRate,
+                      int? rpe,
+                    }) =>
+                        onLogSet(
+                      durationSec: durationSec,
+                      distanceM: distanceM,
+                      heartRate: heartRate,
+                      rpe: rpe,
+                    ),
+                  )
+                : SetInputRow(
+                    setNumber: nextSetNumber,
+                    previousWeight: prevRef?.weightKg,
+                    previousReps: prevRef?.reps,
+                    targetReps: ex.targetReps,
+                    targetSets: ex.targetSets,
+                    onLog: ({
+                      int? reps,
+                      double? weightKg,
+                      int? rpe,
+                      String? tempo,
+                      bool isWarmup = false,
+                    }) =>
+                        onLogSet(
+                      reps: reps,
+                      weightKg: weightKg,
+                      rpe: rpe,
+                      tempo: tempo,
+                      isWarmup: isWarmup,
+                    ),
+                  ),
           ),
         ),
       ],
     );
   }
 
-  String _targetLabel(PlanDayExercise ex) {
+  /// Returns a target string for the exercise header, or null if no targets.
+  String? _targetLabel(PlanDayExercise ex) {
+    if (ex.exerciseType != ExerciseType.strength) {
+      final parts = <String>[];
+      if (ex.targetDurationSec != null) {
+        final mins = ex.targetDurationSec! ~/ 60;
+        final secs = ex.targetDurationSec! % 60;
+        parts.add('$mins:${secs.toString().padLeft(2, '0')}');
+      }
+      if (ex.targetDistanceM != null) {
+        final km = ex.targetDistanceM! / 1000;
+        parts.add('${km.toStringAsFixed(1)} km');
+      }
+      return parts.isEmpty ? null : 'Target: ${parts.join(' · ')}';
+    }
+
     final parts = <String>[];
     if (ex.targetSets != null) parts.add('${ex.targetSets} sets');
     if (ex.targetReps != null && ex.targetReps!.isNotEmpty) {
       parts.add('${ex.targetReps} reps');
     }
-    return 'Target: ${parts.join(' × ')}';
+    return parts.isEmpty ? null : 'Target: ${parts.join(' × ')}';
   }
 }
 
