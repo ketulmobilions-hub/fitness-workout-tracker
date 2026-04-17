@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
+import 'core/widgets/offline_banner.dart';
 
 class FitnessApp extends ConsumerWidget {
   const FitnessApp({super.key});
@@ -24,6 +25,14 @@ class FitnessApp extends ConsumerWidget {
         useMaterial3: true,
       ),
       routerConfig: router,
+      // Global offline banner: wraps every routed page so screens need no
+      // per-screen wiring. The banner sits above all navigation chrome.
+      builder: (context, child) => Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(child: child!),
+        ],
+      ),
     );
   }
 }
