@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:drift/drift.dart' show Value;
 import 'package:fitness_data/fitness_data.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -31,23 +32,52 @@ SyncApiClient syncApiClient(Ref ref) {
   return SyncApiClient(ref.watch(dioProvider));
 }
 
+// How long to wait after connectivity is restored before triggering sync.
+// Debounces rapid airplane-mode toggles so only one sync fires per reconnect.
+const _connectivityDebounceDuration = Duration(seconds: 2);
+
+// How often to sync while the app is open and connected.
+const _periodicSyncInterval = Duration(minutes: 5);
+
 @Riverpod(keepAlive: true)
-class SyncNotifier extends _$SyncNotifier {
+class SyncNotifier extends _$SyncNotifier with WidgetsBindingObserver {
   // Issue 9: Use a Future instead of a bare bool so that callers can choose to
   // await the ongoing sync, and so that the lock is cleared automatically in
   // the finally block even if the sync body throws synchronously.
   Future<void>? _syncFuture;
 
+  // Debounce timer for connectivity restoration events.
+  Timer? _connectivityDebounce;
+
+  // Guards _maybeInitialSync so the auth listener and microtask in build()
+  // both share a single storage read rather than racing past the async gap.
+  Future<void>? _initialSyncCheckFuture;
+
   @override
   SyncState build() {
+    // Issue 3: cancel any debounce timer carried over from a prior build()
+    // invocation (e.g., hot-reload or provider invalidation) before setting up
+    // fresh state. Without this a stale timer could fire triggerSync() against
+    // a partially-initialized notifier.
+    _connectivityDebounce?.cancel();
+    _connectivityDebounce = null;
+
+    // Register as a WidgetsBindingObserver so didChangeAppLifecycleState fires
+    // when the app is brought back to the foreground (AppLifecycleState.resumed).
+    WidgetsBinding.instance.addObserver(this);
+    ref.onDispose(() {
+      WidgetsBinding.instance.removeObserver(this);
+      _connectivityDebounce?.cancel();
+    });
+
     // Watch connectivity: trigger a flush whenever the device goes from offline
-    // to online. ref.listen is valid in build() — the listener lives for the
-    // provider's lifetime and is cancelled on dispose.
+    // to online. Debounced so rapid airplane-mode toggles only fire one sync.
     ref.listen<bool>(
       isConnectedProvider,
       (previous, current) {
         if (current && previous == false) {
-          triggerSync();
+          _connectivityDebounce?.cancel();
+          _connectivityDebounce = Timer(_connectivityDebounceDuration, triggerSync);
         }
       },
     );
@@ -72,32 +102,74 @@ class SyncNotifier extends _$SyncNotifier {
       }
     });
 
+    // Periodic sync while the app is open: fires every 5 minutes if connected.
+    final periodicTimer = Timer.periodic(_periodicSyncInterval, (_) {
+      if (ref.read(isConnectedProvider)) triggerSync();
+    });
+    ref.onDispose(periodicTimer.cancel);
+
     return const SyncState.synced();
   }
 
+  // ── WidgetsBindingObserver ───────────────────────────────────────────────────
+
+  /// Called by the framework when the app lifecycle state changes.
+  /// Trigger a sync whenever the user brings the app back to the foreground,
+  /// but only if connected — avoids setting error state in airplane mode.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        ref.read(isConnectedProvider)) {
+      triggerSync();
+    }
+  }
+
   /// Checks if this user has ever synced. If not, runs a full pull.
-  Future<void> _maybeInitialSync(String userId) async {
-    // Issue 13: check the lock BEFORE the async gap (storage.read).
-    // Without this check, two callers (auth listener + microtask) could both
-    // pass the null check, both await storage.read, and both invoke
-    // performInitialSync. performInitialSync re-checks _syncFuture so a
-    // double-call is still safe, but this avoids the redundant storage read.
-    if (_syncFuture != null) return;
-    final storage = ref.read(flutterSecureStorageProvider);
-    final sinceKey = 'last_synced_at_$userId';
-    final existing = await storage.read(key: sinceKey);
-    if (existing == null) {
-      await performInitialSync();
+  ///
+  /// Coalesces concurrent callers (auth listener + microtask in build) onto a
+  /// single shared Future so the storage.read only happens once, closing the
+  /// TOCTOU gap where both callers could pass the _syncFuture null-check
+  /// synchronously and then both proceed to await storage.read independently.
+  Future<void> _maybeInitialSync(String userId) {
+    _initialSyncCheckFuture ??= _doMaybeInitialSync(userId);
+    return _initialSyncCheckFuture!;
+  }
+
+  Future<void> _doMaybeInitialSync(String userId) async {
+    try {
+      if (_syncFuture != null) return;
+      final storage = ref.read(flutterSecureStorageProvider);
+      final sinceKey = 'last_synced_at_$userId';
+      final existing = await storage.read(key: sinceKey);
+      if (existing == null) {
+        await performInitialSync();
+      }
+    } finally {
+      _initialSyncCheckFuture = null;
     }
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
   /// Flush pending sync items and pull server changes.
-  /// No-op if a sync is already in flight or the user is not authenticated.
+  ///
+  /// Returns immediately (no-op) for guest and unauthenticated users — the
+  /// sync endpoint requires a full account. If a sync is already in flight,
+  /// returns the existing Future so callers (e.g. RefreshIndicator) wait for
+  /// the ongoing sync to complete rather than seeing an instant no-op.
   Future<void> triggerSync() async {
+    // Issue 1: guests have a non-null stableUserId but the sync endpoint
+    // requires requireFullAccount — block them before hitting the network.
+    final authState = ref.read(authProvider);
+    if (authState is! Authenticated) return;
+
     final userId = ref.read(stableUserIdProvider);
-    if (userId == null || _syncFuture != null) return;
+    if (userId == null) return;
+
+    // Issue 6: join in-flight sync instead of returning a completed no-op.
+    // This makes RefreshIndicator wait for the actual sync to finish.
+    if (_syncFuture != null) return _syncFuture!;
+
     _syncFuture = _flushQueue(userId);
     try {
       await _syncFuture;

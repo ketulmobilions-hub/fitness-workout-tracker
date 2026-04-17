@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../../../core/sync/sync_service.dart';
 import '../../providers/workout_history_providers.dart';
 import '../widgets/session_history_card.dart';
 
@@ -86,11 +87,10 @@ class _WorkoutHistoryScreenState
                 isSameDay(_selectedDay, selected) ? null : selected;
             _focusedDay = focused;
           }),
-          // Issue #2 fix: pull-to-refresh calls the notifier's refresh()
-          // method instead of invalidating the provider. This syncs fresh
-          // data from the server without tearing down the Drift subscription.
-          onRefresh: () =>
-              ref.read(completedSessionsProvider.notifier).refresh(),
+          // Pull-to-refresh pushes pending local changes and pulls server
+          // changes via the sync engine. The Drift reactive stream then emits
+          // the updated list automatically — no need to invalidate the provider.
+          onRefresh: () => ref.read(syncProvider.notifier).triggerSync(),
         ),
       ),
     );
