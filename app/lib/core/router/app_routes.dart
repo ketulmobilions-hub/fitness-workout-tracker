@@ -46,4 +46,20 @@ abstract final class AppRoutes {
   /// Returns the concrete path for navigating to a specific session detail
   /// screen, e.g. `/history/abc-123`.
   static String sessionDetailPath(String id) => '/history/$id';
+
+  // Progress routes
+  static const progress = '/progress';
+  static const exerciseProgress = '/progress/exercises/:exerciseId';
+
+  /// Returns the concrete path for navigating to an exercise progress screen,
+  /// e.g. `/progress/exercises/abc-123?name=Bench+Press`.
+  ///
+  /// [name] is encoded as a query parameter so it survives deep links and push
+  /// notification navigation — unlike GoRouter `extra` which is in-memory only.
+  static String exerciseProgressPath(String id, {String? name}) {
+    if (name != null && name.isNotEmpty) {
+      return '/progress/exercises/$id?name=${Uri.encodeQueryComponent(name)}';
+    }
+    return '/progress/exercises/$id';
+  }
 }
