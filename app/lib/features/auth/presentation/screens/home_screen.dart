@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/sync/widgets/sync_status_indicator.dart';
 import '../../providers/auth_notifier.dart';
 import '../../providers/auth_state.dart';
 
@@ -28,6 +29,10 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Fitness Tracker'),
         actions: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: SyncStatusIndicator(),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',

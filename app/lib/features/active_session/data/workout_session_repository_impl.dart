@@ -4,19 +4,24 @@ import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/sync/sync_service.dart';
+
 const _uuid = Uuid();
 
 class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
   WorkoutSessionRepositoryImpl({
     required SessionApiClient apiClient,
     required WorkoutSessionDao sessionDao,
+    required SyncQueueDao syncQueueDao,
     required String userId,
   })  : _apiClient = apiClient,
         _dao = sessionDao,
+        _syncDao = syncQueueDao,
         _userId = userId;
 
   final SessionApiClient _apiClient;
   final WorkoutSessionDao _dao;
+  final SyncQueueDao _syncDao;
   final String _userId;
 
   // ---------------------------------------------------------------------------
@@ -264,7 +269,20 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       return _dtoToSession(dto);
     } catch (e) {
       debugPrint('WorkoutSessionRepository: startSession server sync failed: $e');
-      // Fall through: the local stub is the canonical session until sync.
+      // Enqueue so the sync engine retries when connectivity returns.
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'workout_sessions',
+        recordId: localId,
+        operation: SyncOperation.create,
+        payload: {
+          'planId': planId,
+          'planDayId': planDayId,
+          'startedAt': startTime.toIso8601String(),
+          'status': 'in_progress',
+        },
+      );
     }
 
     return WorkoutSession(
@@ -384,6 +402,29 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       }
     } catch (e) {
       debugPrint('WorkoutSessionRepository: logSet server sync failed: $e');
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'set_logs',
+        recordId: localSetLogId,
+        operation: SyncOperation.create,
+        payload: {
+          'exerciseLogId': exerciseLogId,
+          'sessionId': sessionId,
+          'exerciseId': exerciseId,
+          'setNumber': setNumber,
+          if (reps != null) 'reps': reps,
+          if (weightKg != null) 'weightKg': weightKg,
+          if (durationSec != null) 'durationSec': durationSec,
+          if (distanceM != null) 'distanceM': distanceM,
+          if (paceSecPerKm != null) 'paceSecPerKm': paceSecPerKm,
+          if (heartRate != null) 'heartRate': heartRate,
+          if (rpe != null) 'rpe': rpe,
+          if (tempo != null) 'tempo': tempo,
+          'isWarmup': isWarmup,
+          'completedAt': completedTime.toIso8601String(),
+        },
+      );
     }
 
     return SetLog(
@@ -418,6 +459,14 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       await _apiClient.deleteSet(sessionId, setId);
     } catch (e) {
       debugPrint('WorkoutSessionRepository: deleteSet server sync failed: $e');
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'set_logs',
+        recordId: setId,
+        operation: SyncOperation.delete,
+        payload: {'sessionId': sessionId, 'exerciseLogId': exerciseLogId},
+      );
     }
   }
 
@@ -428,11 +477,22 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     required int durationSec,
     String? notes,
   }) async {
-    // ── Fix #1 (offline-first): always persist locally ────────────────────────
-    // Attempt the server call first (it calculates PRs and streak). If it
-    // fails, still mark the session completed in Drift so the user's workout
-    // is never lost. PRs will be recalculated on the next full sync.
+    // ── Issue 19 fix: write locally FIRST (true offline-first) ───────────────
+    // Persisting to Drift before the server call means the user's workout is
+    // always recorded even if the server call succeeds but the subsequent Drift
+    // write fails. The server response (PRs, streak) then upgrades the record
+    // if connectivity is available.
+    final now = DateTime.now();
+    await _dao.upsertSession(WorkoutSessionsCompanion(
+      id: Value(sessionId),
+      status: const Value(SessionStatus.completed),
+      completedAt: Value(completedAt),
+      durationSec: Value(durationSec),
+      notes: Value(notes),
+      updatedAt: Value(now),
+    ));
 
+    // ── Sync to server (best-effort — server computes PRs and streak) ─────────
     try {
       final envelope = await _apiClient.completeSession(
         sessionId,
@@ -443,6 +503,7 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
         ),
       );
       final sessionDto = envelope.data.session;
+      // Overwrite the local stub with the full server response.
       await _dao.upsertSession(_sessionDtoToCompanion(sessionDto));
 
       return SessionCompletionResult(
@@ -460,20 +521,23 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     } catch (e) {
       debugPrint(
           'WorkoutSessionRepository: completeSession server sync failed: $e');
+      // Enqueue so the server can recalculate PRs and streak on next sync.
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'workout_sessions',
+        recordId: sessionId,
+        operation: SyncOperation.update,
+        payload: {
+          'status': 'completed',
+          'completedAt': completedAt.toIso8601String(),
+          'durationSec': durationSec,
+          if (notes != null) 'notes': notes,
+        },
+      );
     }
 
-    // Fallback: persist completion locally so the user's workout is preserved.
-    final now = DateTime.now();
-    await _dao.upsertSession(WorkoutSessionsCompanion(
-      id: Value(sessionId),
-      status: const Value(SessionStatus.completed),
-      completedAt: Value(completedAt),
-      durationSec: Value(durationSec),
-      notes: Value(notes),
-      updatedAt: Value(now),
-    ));
-
-    // Reconstruct a minimal WorkoutSession from Drift (has startedAt etc.).
+    // Reconstruct from Drift (already written above). PRs will sync later.
     final row = await _dao.getSession(sessionId);
     final session = row != null
         ? _rowToSession(row)
@@ -489,7 +553,6 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
             updatedAt: now,
           );
 
-    // PRs cannot be calculated offline — they will sync on next connection.
     return SessionCompletionResult(session: session, newPRs: []);
   }
 
@@ -514,6 +577,14 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
     } catch (e) {
       debugPrint(
           'WorkoutSessionRepository: abandonSession server sync failed: $e');
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'workout_sessions',
+        recordId: sessionId,
+        operation: SyncOperation.update,
+        payload: {'status': 'abandoned'},
+      );
     }
   }
 

@@ -27,6 +27,13 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
         .watchSingleOrNull();
   }
 
+  /// One-shot query for a single plan. Use instead of [watchPlan] when a
+  /// Future is required (e.g. offline fallback in a repository write path).
+  Future<WorkoutPlanRow?> getPlan(String id) {
+    return (select(workoutPlans)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   Future<void> upsertPlan(WorkoutPlansCompanion companion) {
     // Stamp updatedAt for local writes; preserve server value when syncing.
     final toWrite = companion.updatedAt.present
@@ -136,6 +143,20 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
       innerJoin(exercises, exercises.id.equalsExp(planDayExercises.exerciseId)),
     ]);
     return query.get();
+  }
+
+  /// One-shot query for a single plan day exercise row.
+  /// Used in offline fallbacks to resolve exerciseId/exerciseName/exerciseType.
+  Future<PlanDayExerciseRow?> getPlanDayExercise(String id) {
+    return (select(planDayExercises)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  /// One-shot lookup of an exercise from the shared exercise library.
+  /// Used in offline fallbacks to resolve exercise name and type.
+  Future<ExerciseRow?> getExerciseById(String id) {
+    return (select(exercises)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
   }
 
   Future<void> upsertPlanDayExercise(PlanDayExercisesCompanion companion) {

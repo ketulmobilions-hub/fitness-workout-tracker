@@ -5,6 +5,7 @@ import exerciseRoutes from './exercise.routes.js';
 import muscleGroupRoutes from './muscle-group.routes.js';
 import planRoutes from './plan.routes.js';
 import sessionRoutes from './session.routes.js';
+import syncRoutes from './sync.routes.js';
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.use('/exercises', exerciseRoutes);
 router.use('/muscle-groups', muscleGroupRoutes);
 router.use('/plans', planRoutes);
 router.use('/sessions', sessionRoutes);
+router.use('/sync', syncRoutes);
 
 export default router;
