@@ -98,6 +98,12 @@ class HomeScreen extends ConsumerWidget {
                   label: const Text('Workout History'),
                   onPressed: () => context.push(AppRoutes.workoutHistory),
                 ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.insights),
+                  label: const Text('Progress'),
+                  onPressed: () => context.push(AppRoutes.progress),
+                ),
               ],
             ),
           ),

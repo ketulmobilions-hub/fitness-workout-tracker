@@ -41,6 +41,9 @@ dependencies:
   # Drift (needed for UsersCompanion Value<T> wrapper in repository impl)
   drift: ^2.22.1
 
+  # Charts
+  fl_chart: ^0.70.0
+
   # Local packages
   fitness_data:
     path: packages/fitness_data

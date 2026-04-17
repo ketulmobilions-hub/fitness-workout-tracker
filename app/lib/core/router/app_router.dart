@@ -14,6 +14,7 @@ import '../../features/exercises/presentation/screens/create_exercise_screen.dar
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import '../../features/active_session/active_session.dart';
+import '../../features/progress/progress.dart';
 import '../../features/workout_history/workout_history.dart';
 import '../../features/workout_plans/workout_plans.dart';
 import 'app_routes.dart';
@@ -138,7 +139,19 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.workoutSummary,
         builder: (context, state) {
-          final summary = state.extra as WorkoutSummary;
+          // Issue #10: guard against null extra on deep-link or process-death
+          // navigation. This route is only reachable via in-app push (active
+          // workout → summary), but a deep link or a back-stack restore with no
+          // extra would previously throw a CastError and crash.
+          final summary = state.extra;
+          if (summary is! WorkoutSummary) {
+            // Issue #6: include an AppBar so iOS users have a back affordance
+            // when landing here via a deep link with no WorkoutSummary extra.
+            return Scaffold(
+              appBar: AppBar(),
+              body: const Center(child: Text('Session data not available.')),
+            );
+          }
           return WorkoutSummaryScreen(summary: summary);
         },
       ),
@@ -153,6 +166,27 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.sessionDetail,
         builder: (context, state) => SessionDetailScreen(
           sessionId: state.pathParameters['sessionId']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.progress,
+        builder: (context, state) => const ProgressDashboardScreen(),
+      ),
+      // Static segment 'exercises' ensures this route is never ambiguous.
+      GoRoute(
+        path: AppRoutes.exerciseProgress,
+        builder: (context, state) => ExerciseProgressScreen(
+          exerciseId: state.pathParameters['exerciseId']!,
+          // Issue #14: prefer query param (survives deep links / push
+          // notifications), fall back to in-memory extra (in-app navigation),
+          // then a generic label as last resort.
+          exerciseName: state.uri.queryParameters['name'] ??
+              (state.extra as String?) ??
+              // Issue #3: 'Exercise Progress' is a legible fallback title for
+              // deep-link navigation where neither the query param nor in-memory
+              // extra is available (e.g. push notification with no name payload).
+              // The screen replaces it with the authoritative name once loaded.
+              'Exercise Progress',
         ),
       ),
     ],
