@@ -42,6 +42,7 @@ WorkoutPlanRepository workoutPlanRepository(Ref ref) {
   return WorkoutPlanRepositoryImpl(
     apiClient: ref.watch(planApiClientProvider),
     planDao: ref.watch(appDatabaseProvider).workoutPlanDao,
+    syncQueueDao: ref.watch(appDatabaseProvider).syncQueueDao,
     userId: userId,
   );
 }

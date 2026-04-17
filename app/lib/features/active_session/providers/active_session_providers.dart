@@ -27,6 +27,7 @@ WorkoutSessionRepository workoutSessionRepository(Ref ref) {
   return WorkoutSessionRepositoryImpl(
     apiClient: ref.watch(sessionApiClientProvider),
     sessionDao: ref.watch(appDatabaseProvider).workoutSessionDao,
+    syncQueueDao: ref.watch(appDatabaseProvider).syncQueueDao,
     userId: userId,
   );
 }
