@@ -35,6 +35,11 @@ class HomeScreen extends ConsumerWidget {
             child: SyncStatusIndicator(),
           ),
           IconButton(
+            icon: const Icon(Icons.account_circle_outlined),
+            tooltip: 'Profile',
+            onPressed: () => context.push(AppRoutes.profile),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
             onPressed: () =>

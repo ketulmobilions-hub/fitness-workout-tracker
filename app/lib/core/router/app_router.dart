@@ -14,6 +14,9 @@ import '../../features/exercises/presentation/screens/create_exercise_screen.dar
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import '../../features/active_session/active_session.dart';
+import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/profile/presentation/screens/settings_screen.dart';
 import '../../features/progress/progress.dart';
 import '../../features/streak/presentation/screens/streak_detail_screen.dart';
 import '../../features/workout_history/workout_history.dart';
@@ -176,6 +179,19 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.progress,
         builder: (context, state) => const ProgressDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      // Static segment 'edit' must come BEFORE parameterized siblings.
+      GoRoute(
+        path: AppRoutes.editProfile,
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (context, state) => const SettingsScreen(),
       ),
       // Static segment 'exercises' ensures this route is never ambiguous.
       GoRoute(
