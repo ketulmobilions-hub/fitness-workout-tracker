@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router/app_router.dart';
 import 'core/sync/sync_service.dart';
+import 'core/theme/theme_provider.dart';
 import 'core/widgets/offline_banner.dart';
 
 class FitnessApp extends ConsumerWidget {
@@ -17,13 +18,21 @@ class FitnessApp extends ConsumerWidget {
     ref.watch(syncProvider);
 
     final router = ref.watch(appRouterProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
       title: 'Fitness Tracker',
       theme: ThemeData(
         colorSchemeSeed: Colors.blue,
         useMaterial3: true,
+        brightness: Brightness.light,
       ),
+      darkTheme: ThemeData(
+        colorSchemeSeed: Colors.blue,
+        useMaterial3: true,
+        brightness: Brightness.dark,
+      ),
+      themeMode: themeMode,
       routerConfig: router,
       // Global offline banner: wraps every routed page so screens need no
       // per-screen wiring. The banner sits above all navigation chrome.

@@ -54,6 +54,11 @@ abstract final class AppRoutes {
   static const progress = '/progress';
   static const exerciseProgress = '/progress/exercises/:exerciseId';
 
+  // Profile routes
+  static const profile = '/profile';
+  static const editProfile = '/profile/edit';
+  static const settings = '/settings';
+
   /// Returns the concrete path for navigating to an exercise progress screen,
   /// e.g. `/progress/exercises/abc-123?name=Bench+Press`.
   ///
