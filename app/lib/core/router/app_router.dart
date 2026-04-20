@@ -21,9 +21,25 @@ import '../../features/progress/progress.dart';
 import '../../features/streak/presentation/screens/streak_detail_screen.dart';
 import '../../features/workout_history/workout_history.dart';
 import '../../features/workout_plans/workout_plans.dart';
+import '../navigation/app_shell.dart';
 import 'app_routes.dart';
 
 part 'app_router.g.dart';
+
+// ── Navigator keys ────────────────────────────────────────────────────────────
+// Defined at module level so they are created once and stable for the app's
+// lifetime. The root key is passed to GoRouter so that full-screen routes
+// declared with parentNavigatorKey: _rootKey always render above the shell.
+
+final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final _branch0Key = GlobalKey<NavigatorState>(debugLabel: 'branch-home');
+final _branch1Key = GlobalKey<NavigatorState>(debugLabel: 'branch-plans');
+final _branch2Key = GlobalKey<NavigatorState>(debugLabel: 'branch-progress');
+final _branch3Key = GlobalKey<NavigatorState>(debugLabel: 'branch-profile');
+
+final _branchKeys = [_branch0Key, _branch1Key, _branch2Key, _branch3Key];
+
+// ── Auth redirect ─────────────────────────────────────────────────────────────
 
 /// Pure redirect resolver — exported for unit testing.
 ///
@@ -39,6 +55,8 @@ String? resolveAuthRedirect(AuthState authState, String location) {
     Authenticated() || AuthGuest() => onAuthPage ? AppRoutes.home : null,
   };
 }
+
+// ── Router provider ───────────────────────────────────────────────────────────
 
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
@@ -59,6 +77,7 @@ GoRouter appRouter(Ref ref) {
   ref.onDispose(authListenable.dispose);
 
   return GoRouter(
+    navigatorKey: _rootKey,
     initialLocation: AppRoutes.splash,
     refreshListenable: authListenable,
     redirect: (context, routerState) {
@@ -72,6 +91,7 @@ GoRouter appRouter(Ref ref) {
       );
     },
     routes: [
+      // ── Pre-auth / unauthenticated ───────────────────────────────────────
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => const SplashScreen(),
@@ -94,53 +114,116 @@ GoRouter appRouter(Ref ref) {
           token: state.uri.queryParameters['token'] ?? '',
         ),
       ),
-      GoRoute(
-        path: AppRoutes.home,
-        builder: (context, state) => const HomeScreen(),
+
+      // ── Authenticated shell — bottom nav always visible ──────────────────
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) => AppShell(
+          navigationShell: navigationShell,
+          branchNavigatorKeys: _branchKeys,
+        ),
+        branches: [
+          // Branch 0: Home / Dashboard (nav item 0)
+          StatefulShellBranch(
+            navigatorKey: _branch0Key,
+            routes: [
+              GoRoute(
+                path: AppRoutes.home,
+                builder: (context, state) => const HomeScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 1: Plans (nav item 1)
+          StatefulShellBranch(
+            navigatorKey: _branch1Key,
+            routes: [
+              GoRoute(
+                path: AppRoutes.plans,
+                builder: (context, state) => const PlanListScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 2: Progress (nav item 3 — nav item 2 is the Log action)
+          StatefulShellBranch(
+            navigatorKey: _branch2Key,
+            routes: [
+              GoRoute(
+                path: AppRoutes.progress,
+                builder: (context, state) => const ProgressDashboardScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 3: Profile (nav item 4)
+          StatefulShellBranch(
+            navigatorKey: _branch3Key,
+            routes: [
+              GoRoute(
+                path: AppRoutes.profile,
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
+
+      // ── Full-screen routes (push over shell — no bottom nav) ─────────────
+      // All routes below use parentNavigatorKey: _rootKey so GoRouter always
+      // places them on the root navigator, above the shell scaffold.
+
+      // Exercises
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.exercises,
         builder: (context, state) => const ExerciseListScreen(),
       ),
       // Static route must come BEFORE the parameterized sibling so GoRouter
       // does not match the literal string "create" as an exerciseId.
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.createExercise,
         builder: (context, state) => const CreateExerciseScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.exerciseDetail,
         builder: (context, state) => ExerciseDetailScreen(
           exerciseId: state.pathParameters['exerciseId']!,
         ),
       ),
-      GoRoute(
-        path: AppRoutes.plans,
-        builder: (context, state) => const PlanListScreen(),
-      ),
+
+      // Workout plans (detail / create / edit — full-screen, no bottom nav)
       // Static route must come BEFORE the parameterized sibling so GoRouter
       // does not match the literal string "create" as a planId.
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.createPlan,
         builder: (context, state) => const PlanFormScreen(planId: null),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.planDetail,
         builder: (context, state) => PlanDetailScreen(
           planId: state.pathParameters['planId']!,
         ),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.editPlan,
         builder: (context, state) => PlanFormScreen(
           planId: state.pathParameters['planId']!,
         ),
       ),
+
+      // Active workout (full-screen — launched from the Log action tab)
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.activeWorkout,
         builder: (context, state) => const ActiveWorkoutScreen(),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.workoutSummary,
         builder: (context, state) {
           // Issue #10: guard against null extra on deep-link or process-death
@@ -159,42 +242,36 @@ GoRouter appRouter(Ref ref) {
           return WorkoutSummaryScreen(summary: summary);
         },
       ),
+
+      // Workout history
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.workoutHistory,
         builder: (context, state) => const WorkoutHistoryScreen(),
       ),
-      // GoRouter matches sibling routes by path specificity, not declaration
-      // order. /history and /history/:sessionId are unambiguous as siblings —
-      // no special ordering requirement here (unlike parent/child nesting).
+      // GoRouter evaluates sibling routes in declaration order. These two paths
+      // are unambiguous — /history can never match /history/:sessionId and
+      // vice versa — so ordering does not matter here. For ambiguous siblings
+      // (e.g. a static /history/export vs /history/:sessionId), always declare
+      // the static route first.
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.sessionDetail,
         builder: (context, state) => SessionDetailScreen(
           sessionId: state.pathParameters['sessionId']!,
         ),
       ),
+
+      // Streak detail
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.streak,
         builder: (context, state) => const StreakDetailScreen(),
       ),
+
+      // Exercise progress (sub-page of Progress tab, full-screen)
       GoRoute(
-        path: AppRoutes.progress,
-        builder: (context, state) => const ProgressDashboardScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.profile,
-        builder: (context, state) => const ProfileScreen(),
-      ),
-      // Static segment 'edit' must come BEFORE parameterized siblings.
-      GoRoute(
-        path: AppRoutes.editProfile,
-        builder: (context, state) => const EditProfileScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.settings,
-        builder: (context, state) => const SettingsScreen(),
-      ),
-      // Static segment 'exercises' ensures this route is never ambiguous.
-      GoRoute(
+        parentNavigatorKey: _rootKey,
         path: AppRoutes.exerciseProgress,
         builder: (context, state) => ExerciseProgressScreen(
           exerciseId: state.pathParameters['exerciseId']!,
@@ -209,6 +286,19 @@ GoRouter appRouter(Ref ref) {
               // The screen replaces it with the authoritative name once loaded.
               'Exercise Progress',
         ),
+      ),
+
+      // Profile sub-pages
+      // Static segment 'edit' must come BEFORE parameterized siblings.
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.editProfile,
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.settings,
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );
