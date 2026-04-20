@@ -47,6 +47,9 @@ abstract final class AppRoutes {
   /// screen, e.g. `/history/abc-123`.
   static String sessionDetailPath(String id) => '/history/$id';
 
+  // Streak routes
+  static const streak = '/streak';
+
   // Progress routes
   static const progress = '/progress';
   static const exerciseProgress = '/progress/exercises/:exerciseId';

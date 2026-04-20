@@ -23,3 +23,8 @@ export 'src/progress/exercise_progress.dart';
 export 'src/progress/progress_personal_record.dart';
 export 'src/progress/volume_data.dart';
 export 'src/progress/progress_repository.dart';
+
+export 'src/streaks/streak_day_status.dart';
+export 'src/streaks/streak.dart';
+export 'src/streaks/streak_day.dart';
+export 'src/streaks/streak_repository.dart';

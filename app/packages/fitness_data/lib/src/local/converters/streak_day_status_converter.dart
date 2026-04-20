@@ -1,11 +1,8 @@
 import 'package:drift/drift.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/foundation.dart';
 
-enum StreakDayStatus {
-  completed,
-  restDay,
-  missed,
-}
+export 'package:fitness_domain/src/streaks/streak_day_status.dart';
 
 class StreakDayStatusConverter extends TypeConverter<StreakDayStatus, String> {
   const StreakDayStatusConverter();
