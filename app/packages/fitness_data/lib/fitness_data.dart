@@ -16,6 +16,8 @@ export 'src/remote/session_api_client.dart';
 export 'src/remote/dtos/session_dtos.dart';
 export 'src/remote/dtos/session_list_dto.dart';
 export 'src/remote/dtos/session_request_dtos.dart';
+export 'src/remote/streak_api_client.dart';
+export 'src/remote/dtos/streak_dtos.dart';
 export 'src/remote/sync_api_client.dart';
 export 'src/remote/dtos/sync_dtos.dart';
 

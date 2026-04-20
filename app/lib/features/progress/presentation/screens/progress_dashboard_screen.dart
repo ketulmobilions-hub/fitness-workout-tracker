@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../streak/providers/streak_providers.dart';
 import '../../providers/progress_providers.dart';
 import '../widgets/date_range_selector.dart';
 
@@ -27,6 +28,20 @@ class _ProgressDashboardScreenState
     final volumeAsync = ref.watch(
       volumeDataProvider(volumePeriodToApiParam(_volumePeriod)),
     );
+
+    // Trigger milestone celebration when a new milestone is reached.
+    ref.listen(streakStreamProvider, (_, next) {
+      if (next is AsyncData<Streak?> && next.value != null) {
+        ref
+            .read(milestoneProvider.notifier)
+            .maybeUnlock(next.value!.currentStreak);
+      }
+    });
+    ref.listen(milestoneProvider, (_, milestone) {
+      if (milestone != null && context.mounted) {
+        _showMilestoneCelebration(context, milestone);
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
@@ -115,24 +130,71 @@ class _ProgressDashboardScreenState
 // Overview section — streak card + stats grid
 // ---------------------------------------------------------------------------
 
-class _OverviewSection extends StatelessWidget {
+void _showMilestoneCelebration(BuildContext context, int milestone) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      icon: const Icon(
+        Icons.local_fire_department,
+        size: 48,
+        color: Colors.deepOrange,
+      ),
+      title: Text('$milestone-Day Streak!'),
+      content: Text(
+        "Congratulations! You've reached a $milestone-day streak. Keep it up!",
+        textAlign: TextAlign.center,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Awesome!'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _OverviewSection extends ConsumerWidget {
   const _OverviewSection({required this.overview});
 
   final ProgressOverview overview;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streakAsync = ref.watch(streakStreamProvider);
+    final Streak? streak = streakAsync.maybeWhen(
+      data: (v) => v,
+      orElse: () => null,
+    );
+
+    final today = _todayString();
+    final atRisk = streak != null &&
+        streak.currentStreak > 0 &&
+        streak.lastWorkoutDate != today;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _StreakCard(overview: overview),
+          if (atRisk) ...[
+            const SizedBox(height: 8),
+            _StreakWarningBanner(),
+          ],
           const SizedBox(height: 12),
           _StatsGrid(overview: overview),
         ],
       ),
     );
+  }
+
+  String _todayString() {
+    final now = DateTime.now();
+    final y = now.year.toString().padLeft(4, '0');
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 }
 
@@ -147,40 +209,84 @@ class _StreakCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     return Card(
       color: colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.local_fire_department,
-              size: 40,
-              color: Colors.deepOrange,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${overview.currentStreak} day streak',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  Text(
-                    'Longest: ${overview.longestStreak} days',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer.withValues(
-                        alpha: 0.7,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.streak),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.local_fire_department,
+                size: 40,
+                color: Colors.deepOrange,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${overview.currentStreak} day streak',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimaryContainer,
                       ),
                     ),
-                  ),
-                ],
+                    Text(
+                      'Longest: ${overview.longestStreak} days',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onPrimaryContainer.withValues(
+                          alpha: 0.7,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onPrimaryContainer.withValues(alpha: 0.6),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakWarningBanner extends StatelessWidget {
+  const _StreakWarningBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: colorScheme.onTertiaryContainer,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Work out today to keep your streak alive!',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onTertiaryContainer,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

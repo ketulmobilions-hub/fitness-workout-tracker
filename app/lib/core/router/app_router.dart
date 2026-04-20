@@ -15,6 +15,7 @@ import '../../features/exercises/presentation/screens/exercise_detail_screen.dar
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import '../../features/active_session/active_session.dart';
 import '../../features/progress/progress.dart';
+import '../../features/streak/presentation/screens/streak_detail_screen.dart';
 import '../../features/workout_history/workout_history.dart';
 import '../../features/workout_plans/workout_plans.dart';
 import 'app_routes.dart';
@@ -167,6 +168,10 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => SessionDetailScreen(
           sessionId: state.pathParameters['sessionId']!,
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.streak,
+        builder: (context, state) => const StreakDetailScreen(),
       ),
       GoRoute(
         path: AppRoutes.progress,
