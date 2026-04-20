@@ -8,6 +8,7 @@ import sessionRoutes from './session.routes.js';
 import syncRoutes from './sync.routes.js';
 import progressRoutes from './progress.routes.js';
 import streakRoutes from './streak.routes.js';
+import userRoutes from './user.routes.js';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/sessions', sessionRoutes);
 router.use('/sync', syncRoutes);
 router.use('/progress', progressRoutes);
 router.use('/streaks', streakRoutes);
+router.use('/users', userRoutes);
 
 export default router;

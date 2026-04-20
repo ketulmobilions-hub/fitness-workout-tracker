@@ -60,6 +60,7 @@ model User {
   passwordHash String?      @map("password_hash")
   displayName  String?      @map("display_name")
   avatarUrl    String?      @map("avatar_url")
+  bio          String?      @db.Text
   authProvider   AuthProvider @default(email) @map("auth_provider")
   providerUserId String?      @unique @map("provider_user_id")
   isGuest        Boolean      @default(false) @map("is_guest")

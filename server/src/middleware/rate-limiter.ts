@@ -32,10 +32,16 @@ function makeStore(prefix: string): Store | undefined {
   });
 }
 
+// Skip rate limiting entirely in the test environment so integration tests can make
+// many requests without exhausting per-endpoint budgets (e.g. deleteAccountLimiter
+// is 5/window, which is easily reached across a test suite).
+const skipInTest = env.NODE_ENV === 'test' ? (): boolean => true : undefined;
+
 const baseOptions = (store: Store | undefined): Partial<Options> => ({
   standardHeaders: true,
   legacyHeaders: false,
   store,
+  skip: skipInTest,
 });
 
 export const globalLimiter = rateLimit({
@@ -114,6 +120,32 @@ export const guestLimiter = rateLimit({
     status: 429,
     error: 'Too Many Requests',
     message: 'Too many guest account requests, please try again later.',
+  },
+});
+
+// For profile updates: generous limit — a user editing their profile is legitimate
+// but rate-limited to prevent bulk scraping or enumeration via update responses.
+export const profileUpdateLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:profile:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 30,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many profile update requests, please try again later.',
+  },
+});
+
+// For account deletion: very strict — a legitimate user deletes their account at most
+// once; any burst is likely abuse or a client bug.
+export const deleteAccountLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:delete-account:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 5,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many account deletion requests, please try again later.',
   },
 });
 
