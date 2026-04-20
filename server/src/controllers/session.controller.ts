@@ -638,40 +638,56 @@ export const completeSession = async (_req: Request, res: Response): Promise<voi
       include: sessionDetailInclude,
     });
 
-    // 2. Streak update.
-    const yesterday = new Date(completedAt);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    // Derive yesterday's local date using the same offset as today.
-    const yesterdayStr = localDateFromISO(
-      yesterday.toISOString().replace('Z', completedAtStr.match(/([+-]\d{2}:\d{2})$/)?.[1] ?? 'Z'),
-    );
+    // 2. Streak update — only for sessions linked to a plan day.
+    // Free workouts (no planDayId) do not affect the streak because the daily job
+    // checks plan schedule to determine missed vs rest days; free sessions are
+    // outside that system.
+    if (completed.planDayId) {
+      // Issue 8: explicit UTC midnight construction — `new Date('YYYY-MM-DD')` is
+      // spec-defined as UTC, but being explicit avoids surprising future readers.
+      const todayDate = new Date(`${today}T00:00:00Z`);
 
-    const streak = await tx.streak.findUnique({
-      where: { userId },
-      select: { id: true, currentStreak: true, longestStreak: true, lastWorkoutDate: true },
-    });
-
-    if (!streak) {
-      await tx.streak.create({
-        data: { userId, currentStreak: 1, longestStreak: 1, lastWorkoutDate: new Date(today) },
+      // Issue 7: idempotency guard for multiple planned sessions on the same day.
+      // If today is already 'completed' in streak_history, a prior planned session
+      // already incremented the counter — don't re-increment.
+      const todayHistory = await tx.streakHistory.findUnique({
+        where: { userId_date: { userId, date: todayDate } },
+        select: { status: true },
       });
-    } else {
-      const lastDate = streak.lastWorkoutDate?.toISOString().slice(0, 10) ?? null;
-      if (lastDate !== today) {
-        const newCurrent = lastDate === yesterdayStr ? streak.currentStreak + 1 : 1;
-        const newLongest = Math.max(newCurrent, streak.longestStreak);
-        await tx.streak.update({
+
+      if (todayHistory?.status !== 'completed') {
+        // Find the most recent streak_history entry that is not a rest day.
+        // Rest days are transparent to streak counting — they bridge workout days
+        // in plans that don't schedule every calendar day.
+        const lastNonRestEntry = await tx.streakHistory.findFirst({
+          where: { userId, date: { lt: todayDate }, status: { not: 'rest_day' } },
+          orderBy: { date: 'desc' },
+          select: { status: true },
+        });
+
+        const streak = await tx.streak.findUnique({
           where: { userId },
-          data: { currentStreak: newCurrent, longestStreak: newLongest, lastWorkoutDate: new Date(today) },
+          select: { currentStreak: true, longestStreak: true },
+        });
+
+        // Extend streak if the last non-rest day was completed; otherwise start fresh.
+        const newCurrent =
+          lastNonRestEntry?.status === 'completed' ? (streak?.currentStreak ?? 0) + 1 : 1;
+        const newLongest = Math.max(newCurrent, streak?.longestStreak ?? 0);
+
+        await tx.streak.upsert({
+          where: { userId },
+          create: { userId, currentStreak: newCurrent, longestStreak: newLongest, lastWorkoutDate: todayDate },
+          update: { currentStreak: newCurrent, longestStreak: newLongest, lastWorkoutDate: todayDate },
+        });
+
+        await tx.streakHistory.upsert({
+          where: { userId_date: { userId, date: todayDate } },
+          create: { userId, date: todayDate, status: 'completed' },
+          update: { status: 'completed' },
         });
       }
     }
-
-    await tx.streakHistory.upsert({
-      where: { userId_date: { userId, date: new Date(today) } },
-      create: { userId, date: new Date(today), status: 'completed' },
-      update: { status: 'completed' },
-    });
 
     // 3. PR detection — batch-load all current PRs for exercises in this session,
     // then evaluate candidates in memory to avoid N+1 queries inside the transaction.
