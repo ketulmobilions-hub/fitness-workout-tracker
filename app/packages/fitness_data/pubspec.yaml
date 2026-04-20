@@ -18,6 +18,8 @@ dependencies:
   sqlite3_flutter_libs: ^0.5.29
   path_provider: ^2.1.5
   path: ^1.9.1
+  fitness_domain:
+    path: ../fitness_domain
 
 dev_dependencies:
   flutter_test:

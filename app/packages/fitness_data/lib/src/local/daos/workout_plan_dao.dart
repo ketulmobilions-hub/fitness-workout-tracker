@@ -1,16 +1,19 @@
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../tables/exercise_library_tables.dart';
 import '../tables/workout_plan_tables.dart';
 
 part 'workout_plan_dao.g.dart';
 
-@DriftAccessor(tables: [WorkoutPlans, PlanDays, PlanDayExercises])
+@DriftAccessor(tables: [WorkoutPlans, PlanDays, PlanDayExercises, Exercises])
 class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
     with _$WorkoutPlanDaoMixin {
   WorkoutPlanDao(super.db);
 
+  // ---------------------------------------------------------------------------
   // Plans
+  // ---------------------------------------------------------------------------
 
   Stream<List<WorkoutPlanRow>> watchPlansForUser(String userId) {
     return (select(workoutPlans)
@@ -22,6 +25,13 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
   Stream<WorkoutPlanRow?> watchPlan(String id) {
     return (select(workoutPlans)..where((t) => t.id.equals(id)))
         .watchSingleOrNull();
+  }
+
+  /// One-shot query for a single plan. Use instead of [watchPlan] when a
+  /// Future is required (e.g. offline fallback in a repository write path).
+  Future<WorkoutPlanRow?> getPlan(String id) {
+    return (select(workoutPlans)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
   }
 
   Future<void> upsertPlan(WorkoutPlansCompanion companion) {
@@ -36,7 +46,9 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
     return (delete(workoutPlans)..where((t) => t.id.equals(id))).go();
   }
 
-  // Plan days
+  // ---------------------------------------------------------------------------
+  // Plan days — reactive streams
+  // ---------------------------------------------------------------------------
 
   Stream<List<PlanDayRow>> watchDaysForPlan(String planId) {
     return (select(planDays)
@@ -48,6 +60,24 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
+  // ---------------------------------------------------------------------------
+  // Plan days — one-shot Future queries (use these inside asyncMap)
+  // ---------------------------------------------------------------------------
+
+  /// One-shot query for days belonging to [planId], ordered by week then sort.
+  /// Use this (not the watch variant) inside [asyncMap] callbacks to avoid
+  /// hanging on an empty table — watch streams only emit on writes, not on
+  /// initial subscribe when the table is empty.
+  Future<List<PlanDayRow>> getDaysForPlan(String planId) {
+    return (select(planDays)
+          ..where((t) => t.planId.equals(planId))
+          ..orderBy([
+            (t) => OrderingTerm.asc(t.weekNumber),
+            (t) => OrderingTerm.asc(t.sortOrder),
+          ]))
+        .get();
+  }
+
   Future<void> upsertPlanDay(PlanDaysCompanion companion) {
     return into(planDays).insertOnConflictUpdate(companion);
   }
@@ -56,7 +86,21 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
     return (delete(planDays)..where((t) => t.id.equals(id))).go();
   }
 
-  // Plan day exercises
+  /// Deletes all days belonging to [planId] whose IDs are NOT in [keepIds].
+  /// Called during sync to remove server-deleted days from the local cache.
+  Future<void> deletePlanDaysNotInSet(String planId, Set<String> keepIds) {
+    return (delete(planDays)
+          ..where(
+            (t) =>
+                t.planId.equals(planId) &
+                t.id.isNotIn(keepIds.isEmpty ? [''] : keepIds),
+          ))
+        .go();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plan day exercises — reactive streams
+  // ---------------------------------------------------------------------------
 
   Stream<List<PlanDayExerciseRow>> watchExercisesForPlanDay(
       String planDayId) {
@@ -66,12 +110,74 @@ class WorkoutPlanDao extends DatabaseAccessor<AppDatabase>
         .watch();
   }
 
+  /// Returns a reactive stream of (PlanDayExerciseRow, ExerciseRow) pairs for
+  /// [planDayId], ordered by sort_order. Use this for real-time UI updates.
+  ///
+  /// Read results with:
+  ///   row.readTable(planDayExercises)  → PlanDayExerciseRow
+  ///   row.readTable(exercises)          → ExerciseRow
+  Stream<List<TypedResult>> watchExercisesForPlanDayWithDetails(
+      String planDayId) {
+    final query = (select(planDayExercises)
+          ..where((e) => e.planDayId.equals(planDayId))
+          ..orderBy([(e) => OrderingTerm.asc(e.sortOrder)]))
+        .join([
+      innerJoin(exercises, exercises.id.equalsExp(planDayExercises.exerciseId)),
+    ]);
+    return query.watch();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plan day exercises — one-shot Future queries (use these inside asyncMap)
+  // ---------------------------------------------------------------------------
+
+  /// One-shot query for exercises in [planDayId] joined with their exercise
+  /// details, ordered by sort_order.
+  /// Use this (not the watch variant) inside [asyncMap] callbacks.
+  Future<List<TypedResult>> getExercisesForPlanDayWithDetails(
+      String planDayId) {
+    final query = (select(planDayExercises)
+          ..where((e) => e.planDayId.equals(planDayId))
+          ..orderBy([(e) => OrderingTerm.asc(e.sortOrder)]))
+        .join([
+      innerJoin(exercises, exercises.id.equalsExp(planDayExercises.exerciseId)),
+    ]);
+    return query.get();
+  }
+
+  /// One-shot query for a single plan day exercise row.
+  /// Used in offline fallbacks to resolve exerciseId/exerciseName/exerciseType.
+  Future<PlanDayExerciseRow?> getPlanDayExercise(String id) {
+    return (select(planDayExercises)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
+  /// One-shot lookup of an exercise from the shared exercise library.
+  /// Used in offline fallbacks to resolve exercise name and type.
+  Future<ExerciseRow?> getExerciseById(String id) {
+    return (select(exercises)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   Future<void> upsertPlanDayExercise(PlanDayExercisesCompanion companion) {
     return into(planDayExercises).insertOnConflictUpdate(companion);
   }
 
   Future<int> deletePlanDayExercise(String id) {
     return (delete(planDayExercises)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Deletes all exercises in [planDayId] whose IDs are NOT in [keepIds].
+  /// Called during sync to remove server-deleted exercises from the local cache.
+  Future<void> deletePlanDayExercisesNotInSet(
+      String planDayId, Set<String> keepIds) {
+    return (delete(planDayExercises)
+          ..where(
+            (t) =>
+                t.planDayId.equals(planDayId) &
+                t.id.isNotIn(keepIds.isEmpty ? [''] : keepIds),
+          ))
+        .go();
   }
 
   /// Updates [sortOrder] for each entry in [orderedIds] in position order.

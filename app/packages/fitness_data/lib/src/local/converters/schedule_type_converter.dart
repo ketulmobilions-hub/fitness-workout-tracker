@@ -1,10 +1,6 @@
 import 'package:drift/drift.dart';
+import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/foundation.dart';
-
-enum ScheduleType {
-  weekly,
-  recurring,
-}
 
 class ScheduleTypeConverter extends TypeConverter<ScheduleType, String> {
   const ScheduleTypeConverter();

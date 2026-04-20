@@ -10,6 +10,7 @@ class Users extends Table {
   TextColumn get passwordHash => text().nullable()();
   TextColumn get displayName => text()();
   TextColumn get avatarUrl => text().nullable()();
+  TextColumn get bio => text().nullable()();
   TextColumn get authProvider =>
       text().map(const AuthProviderConverter())();
   BoolColumn get isGuest =>
