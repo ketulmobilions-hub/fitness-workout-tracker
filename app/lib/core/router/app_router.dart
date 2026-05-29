@@ -46,13 +46,16 @@ final _branchKeys = [_branch0Key, _branch1Key, _branch2Key, _branch3Key];
 /// Returns the target route path when a redirect is needed, or `null` to allow
 /// the current navigation to proceed.
 String? resolveAuthRedirect(AuthState authState, String location) {
-  final onAuthPage =
-      location.startsWith('/auth') || location == AppRoutes.splash;
+  // Match the '/auth' route or any '/auth/...' subroute, but not unrelated
+  // paths that merely share the prefix (e.g. a future '/authors').
+  final onAuthFlow = location == '/auth' || location.startsWith('/auth/');
+  final onSplash = location == AppRoutes.splash;
   return switch (authState) {
     AuthInitializing() => null,
     AuthLoading() => null,
-    AuthUnauthenticated() => onAuthPage ? null : AppRoutes.login,
-    Authenticated() || AuthGuest() => onAuthPage ? AppRoutes.home : null,
+    AuthUnauthenticated() => onAuthFlow ? null : AppRoutes.login,
+    Authenticated() ||
+    AuthGuest() => (onAuthFlow || onSplash) ? AppRoutes.home : null,
   };
 }
 
@@ -204,16 +207,14 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: AppRoutes.planDetail,
-        builder: (context, state) => PlanDetailScreen(
-          planId: state.pathParameters['planId']!,
-        ),
+        builder: (context, state) =>
+            PlanDetailScreen(planId: state.pathParameters['planId']!),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: AppRoutes.editPlan,
-        builder: (context, state) => PlanFormScreen(
-          planId: state.pathParameters['planId']!,
-        ),
+        builder: (context, state) =>
+            PlanFormScreen(planId: state.pathParameters['planId']!),
       ),
 
       // Active workout (full-screen — launched from the Log action tab)
@@ -257,9 +258,8 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: AppRoutes.sessionDetail,
-        builder: (context, state) => SessionDetailScreen(
-          sessionId: state.pathParameters['sessionId']!,
-        ),
+        builder: (context, state) =>
+            SessionDetailScreen(sessionId: state.pathParameters['sessionId']!),
       ),
 
       // Streak detail
@@ -278,7 +278,8 @@ GoRouter appRouter(Ref ref) {
           // Issue #14: prefer query param (survives deep links / push
           // notifications), fall back to in-memory extra (in-app navigation),
           // then a generic label as last resort.
-          exerciseName: state.uri.queryParameters['name'] ??
+          exerciseName:
+              state.uri.queryParameters['name'] ??
               (state.extra as String?) ??
               // Issue #3: 'Exercise Progress' is a legible fallback title for
               // deep-link navigation where neither the query param nor in-memory

@@ -79,10 +79,11 @@ void main() {
       );
     });
 
-    test('does not redirect from splash', () {
-      // Splash is treated as an auth page — avoids premature redirect on cold
-      // start when the token load hasn't finished yet.
-      expect(redirect(state, AppRoutes.splash), isNull);
+    test('redirects to login from splash', () {
+      // Once auth has resolved to Unauthenticated, the token load is finished
+      // (Initializing/Loading cover the in-flight case). Staying on splash
+      // would leave the user stuck on the spinner forever.
+      expect(redirect(state, AppRoutes.splash), AppRoutes.login);
     });
 
     test('redirects to login from a protected route', () {
