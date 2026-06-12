@@ -95,16 +95,17 @@ model MuscleGroup {
 }
 
 model Exercise {
-  id           String       @id @default(uuid()) @db.Uuid
-  name         String
-  description  String?
-  exerciseType ExerciseType @map("exercise_type")
-  instructions String?      @db.Text
-  mediaUrl     String?      @map("media_url")
-  createdBy    String?      @map("created_by") @db.Uuid
-  isCustom     Boolean      @default(false) @map("is_custom")
-  createdAt    DateTime     @default(now()) @map("created_at")
-  updatedAt    DateTime     @updatedAt @map("updated_at")
+  id                String       @id @default(uuid()) @db.Uuid
+  name              String
+  description       String?
+  exerciseType      ExerciseType @map("exercise_type")
+  instructions      String?      @db.Text
+  mediaUrl          String?      @map("media_url")
+  createdBy         String?      @map("created_by") @db.Uuid
+  isCustom          Boolean      @default(false) @map("is_custom")
+  isCompetitionLift Boolean      @default(false) @map("is_competition_lift")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
 
   creator          User?                 @relation(fields: [createdBy], references: [id], onDelete: SetNull)
   muscleGroups     ExerciseMuscleGroup[]
