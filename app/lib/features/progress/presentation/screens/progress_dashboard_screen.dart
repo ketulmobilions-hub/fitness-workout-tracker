@@ -8,6 +8,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../streak/providers/streak_providers.dart';
 import '../../providers/progress_providers.dart';
 import '../widgets/date_range_selector.dart';
+import '../widgets/one_rm_calculator_widget.dart';
 
 class ProgressDashboardScreen extends ConsumerStatefulWidget {
   const ProgressDashboardScreen({super.key});
@@ -45,6 +46,18 @@ class _ProgressDashboardScreenState
 
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => const OneRmCalculatorWidget(),
+        ),
+        icon: const Icon(Icons.calculate_outlined),
+        label: const Text('1RM Calc'),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           // Capture the period now so that a chip tap mid-refresh (Issue #3)

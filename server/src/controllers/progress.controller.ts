@@ -3,8 +3,15 @@ import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
+import { estimateOneRepMax } from '../utils/oneRmCalculator.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+type OneRmHistoryRow = {
+  session_date: Date | string;
+  weight_kg: string;
+  reps: string;
+};
 
 // ExercisePeriod: periods valid for the exercise progress endpoint (no '1w').
 type ExercisePeriod = '1m' | '3m' | '6m' | '1y' | 'all';
@@ -88,9 +95,6 @@ function granularityToPgTrunc(g: Granularity): 'day' | 'week' | 'month' {
   }
 }
 
-function computeEpley1RM(weightKg: number, reps: number): number {
-  return Math.round(weightKg * (1 + reps / 30) * 100) / 100;
-}
 
 function toDateString(value: Date | string): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -229,7 +233,8 @@ export const getExerciseProgress = async (_req: Request, res: Response): Promise
       WHERE ws.user_id = ${userId}::uuid
         AND ws.status = 'completed'
         AND sl.weight_kg IS NOT NULL
-        AND sl.reps IS NOT NULL
+        AND sl.reps >= 1
+        AND sl.reps <= 99
         AND sl.is_warmup = false
         AND (${start}::timestamptz IS NULL OR ws.completed_at >= ${start}::timestamptz)
       ORDER BY (sl.weight_kg * (1 + sl.reps / 30.0)) DESC
@@ -255,7 +260,7 @@ export const getExerciseProgress = async (_req: Request, res: Response): Promise
 
   const bestSet = bestSetRows[0] ?? null;
   const estimatedOneRepMax =
-    bestSet ? computeEpley1RM(Number(bestSet.weight_kg), Number(bestSet.reps)) : null;
+    bestSet ? estimateOneRepMax(Number(bestSet.weight_kg), Number(bestSet.reps)) : null;
 
   const history: ExerciseHistoryEntry[] = historyRows.map((row) => ({
     date: toDateString(row.session_date),
@@ -312,6 +317,62 @@ export const getPersonalRecords = async (_req: Request, res: Response): Promise<
       achievedAt: pr.achievedAt.toISOString(),
       sessionId: pr.sessionId,
     })),
+  });
+};
+
+export const get1RmHistory = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+  const { exerciseId } = res.locals.validated!.params as { exerciseId: string };
+  const { period } = res.locals.validated!.query as { period: ExercisePeriod };
+
+  const exercise = await prisma.exercise.findFirst({
+    where: { id: exerciseId, OR: [{ isCustom: false }, { createdBy: userId }] },
+    select: { id: true, name: true },
+  });
+  if (!exercise) throw new AppError(404, 'Exercise not found');
+
+  const start = getPeriodStart(period);
+
+  // Fetch all qualifying sets and group in TypeScript so the set selected per
+  // day uses the same estimateOneRepMax function as the displayed value — SQL's
+  // inline Epley and the 3-formula average can disagree on which set "wins".
+  const rows = await prisma.$queryRaw<OneRmHistoryRow[]>`
+    SELECT
+      DATE(ws.completed_at) AS session_date,
+      sl.weight_kg,
+      sl.reps
+    FROM workout_sessions ws
+    JOIN exercise_logs el ON el.session_id = ws.id AND el.exercise_id = ${exerciseId}::uuid
+    JOIN set_logs sl ON sl.exercise_log_id = el.id
+    WHERE ws.user_id = ${userId}::uuid
+      AND ws.status = 'completed'
+      AND sl.weight_kg IS NOT NULL
+      AND sl.reps >= 1
+      AND sl.reps <= 99
+      AND sl.is_warmup = false
+      AND (${start}::timestamptz IS NULL OR ws.completed_at >= ${start}::timestamptz)
+    ORDER BY DATE(ws.completed_at) ASC
+  `;
+
+  // Pick the set with the highest estimated 1RM per calendar day.
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    const date = toDateString(row.session_date);
+    const est = estimateOneRepMax(Number(row.weight_kg), Number(row.reps));
+    const existing = byDate.get(date);
+    if (existing === undefined || est > existing) {
+      byDate.set(date, est);
+    }
+  }
+
+  const history = Array.from(byDate.entries()).map(([date, estimatedOneRepMax]) => ({
+    date,
+    estimatedOneRepMax,
+  }));
+
+  sendSuccess(res, {
+    exercise: { id: exercise.id, name: exercise.name },
+    history,
   });
 };
 
