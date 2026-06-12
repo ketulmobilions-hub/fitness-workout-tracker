@@ -119,6 +119,10 @@ async function main(): Promise<void> {
         { name: 'yoga_mat', displayName: 'Yoga Mat' },
         { name: 'pool', displayName: 'Pool' },
         { name: 'elliptical', displayName: 'Elliptical Machine' },
+        { name: 'trap_bar', displayName: 'Trap Bar / Hex Bar' },
+        { name: 'safety_squat_bar', displayName: 'Safety Squat Bar' },
+        { name: 'glute_ham_raise', displayName: 'GHR Machine' },
+        { name: 'reverse_hyper', displayName: 'Reverse Hyperextension Machine' },
       ];
 
       const eq: Record<string, string> = {};
@@ -135,6 +139,7 @@ async function main(): Promise<void> {
         instructions: string;
         muscles: { name: string; primary: boolean }[];
         equipment: string[];
+        isCompetitionLift?: boolean;
       };
 
       // Notes on ExerciseType classification:
@@ -604,6 +609,7 @@ async function main(): Promise<void> {
             { name: 'forearms', primary: false },
           ],
           equipment: ['barbell'],
+          isCompetitionLift: true,
         },
         {
           name: 'Romanian Deadlift',
@@ -631,6 +637,7 @@ async function main(): Promise<void> {
             { name: 'lower_back', primary: false },
           ],
           equipment: ['barbell'],
+          isCompetitionLift: true,
         },
         {
           name: 'Leg Press',
@@ -1392,6 +1399,344 @@ async function main(): Promise<void> {
           muscles: [{ name: 'glutes', primary: true }],
           equipment: ['bodyweight', 'yoga_mat'],
         },
+
+        // ── Powerlifting — Competition Lifts & Main Variants ──
+        {
+          name: 'Low Bar Back Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Competition squat variant with the bar resting low on the rear delts, allowing a more forward lean and greater posterior chain involvement.',
+          instructions:
+            'Position the bar low on your rear delts, just below the spine of the scapula. Take a shoulder-width or slightly wider stance with toes flared. Break at the hips first, keep chest up, and descend until hip crease is below the top of the knee. Drive through the whole foot back to lockout.',
+          muscles: [
+            { name: 'glutes', primary: true },
+            { name: 'quadriceps', primary: true },
+            { name: 'hamstrings', primary: false },
+            { name: 'core', primary: false },
+            { name: 'lower_back', primary: false },
+          ],
+          equipment: ['barbell'],
+          isCompetitionLift: true,
+        },
+        {
+          name: 'High Bar Back Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Olympic-style squat with bar resting on the upper traps, favouring a more upright torso and greater quad drive.',
+          instructions:
+            'Place the bar on your upper traps. Set a shoulder-width stance, toes slightly out. Keep your torso as upright as possible, break simultaneously at hips and knees, and descend to at least parallel. Drive through the floor to lockout.',
+          muscles: [
+            { name: 'quadriceps', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'hamstrings', primary: false },
+            { name: 'core', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Competition Bench Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'IPF/USAPL-legal bench press with a mandatory pause at the chest before the press command.',
+          instructions:
+            'Lie on the bench with a medium-wide grip (index fingers on the rings or just outside). Retract and depress scapulae, create a slight arch. Lower the bar to your mid-sternum and hold it motionless until the "Press" command, then drive explosively to lockout.',
+          muscles: [
+            { name: 'chest', primary: true },
+            { name: 'triceps', primary: false },
+            { name: 'shoulders', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+          isCompetitionLift: true,
+        },
+        {
+          name: 'Pause Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Squat with a 2–3 second pause at the bottom to eliminate the stretch reflex and build strength out of the hole.',
+          instructions:
+            'Perform a low or high bar squat. At the bottom position (hip crease below knee), hold completely still for 2–3 seconds — no bouncing. Drive back up with maximal intent.',
+          muscles: [
+            { name: 'quadriceps', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'core', primary: false },
+            { name: 'hamstrings', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Box Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Squat to a box that breaks parallel, teaching hip-hinge mechanics and controlled descent with a moment of relaxation before the concentric.',
+          instructions:
+            'Set a box slightly below parallel height behind you. Squat back and down onto the box, sitting fully with hips relaxed for one breath. Do not rock — drive up by pushing through the floor with hip extension.',
+          muscles: [
+            { name: 'glutes', primary: true },
+            { name: 'hamstrings', primary: true },
+            { name: 'quadriceps', primary: false },
+            { name: 'core', primary: false },
+          ],
+          equipment: ['barbell', 'box'],
+        },
+        {
+          name: 'Front Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Barbell squat with the bar in the front rack position, demanding an upright torso and heavy quad emphasis.',
+          instructions:
+            'Rest the bar across your front delts in a clean grip or cross-arm position. Elbows stay high throughout. Descend with a very upright torso to at least parallel, then drive up through the heels.',
+          muscles: [
+            { name: 'quadriceps', primary: true },
+            { name: 'glutes', primary: false },
+            { name: 'core', primary: true },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Safety Bar Squat',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Squat using a safety squat bar that places the load on the anterior shoulders, reducing stress on the wrists and elbows while increasing core and quad demand.',
+          instructions:
+            'Position the SSB yoke on your upper traps and grip the front handles. Squat as normal, fighting the bar\'s tendency to pull you forward. Elbows stay up and core is braced hard throughout.',
+          muscles: [
+            { name: 'quadriceps', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'core', primary: true },
+            { name: 'hamstrings', primary: false },
+          ],
+          equipment: ['safety_squat_bar'],
+        },
+        {
+          name: 'Close Grip Bench Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Bench press variation with a narrow grip that shifts emphasis to the triceps — a key accessory for improving lockout strength.',
+          instructions:
+            'Grip the bar with hands 6–10 inches apart (roughly thumbs at shoulder width). Lower to the mid-chest, keeping elbows tucked at about 45°. Press to lockout, squeezing the triceps hard.',
+          muscles: [
+            { name: 'triceps', primary: true },
+            { name: 'chest', primary: false },
+            { name: 'shoulders', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Pause Bench Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Bench press with a 2–3 second chest pause, identical to competition execution, eliminating the stretch reflex to build raw pressing power.',
+          instructions:
+            'Lower the bar to your chest under control and hold it motionless for a full 2–3 count — no sinking into the chest. Press as explosively as possible after the pause.',
+          muscles: [
+            { name: 'chest', primary: true },
+            { name: 'triceps', primary: false },
+            { name: 'shoulders', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Floor Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Bench press performed lying on the floor, limiting range of motion to strengthen the lockout and reducing shoulder stress.',
+          instructions:
+            'Lie on the floor with knees bent, feet flat. Unrack or clean the bar and lower it until your triceps touch the floor. Pause, then press explosively. The floor eliminates leg drive.',
+          muscles: [
+            { name: 'triceps', primary: true },
+            { name: 'chest', primary: true },
+            { name: 'shoulders', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Board Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Bench press to a board placed on the chest to train a specific range of motion, particularly useful for overloading the lockout.',
+          instructions:
+            'Have a spotter hold a 2–5 board stack on your chest (or use a slingshot board). Press to the board, pause, then drive to lockout. The board shortens the ROM and allows heavier loading.',
+          muscles: [
+            { name: 'triceps', primary: true },
+            { name: 'chest', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Incline Barbell Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Barbell press on a 30–45° incline bench, targeting the upper chest and front delts — a common powerlifting accessory for building pressing volume.',
+          instructions:
+            'Set bench to 30–45°. Grip bar at a similar width to your bench press. Lower bar to the upper chest/clavicle area, then press to lockout. Keep shoulder blades retracted.',
+          muscles: [
+            { name: 'chest', primary: true },
+            { name: 'shoulders', primary: false },
+            { name: 'triceps', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Larsen Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Bench press performed with legs raised (no leg drive), increasing upper body demand and building raw pressing strength.',
+          instructions:
+            'Lie flat on the bench, lift feet off the floor and either extend legs or cross them. Perform a full bench press without any leg assistance. Requires greater shoulder and lat stability.',
+          muscles: [
+            { name: 'chest', primary: true },
+            { name: 'triceps', primary: false },
+            { name: 'shoulders', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Deficit Deadlift',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Deadlift performed standing on a 1–4 inch deficit (plates or platform), increasing range of motion to strengthen the start off the floor.',
+          instructions:
+            'Stand on a 2.5–10 kg plate or a small platform, feet hip-width. The bar is still on the floor at normal height. Pull from this extended starting position, focusing on keeping chest up and getting the bar moving off the floor.',
+          muscles: [
+            { name: 'hamstrings', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'lower_back', primary: true },
+            { name: 'quadriceps', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Pause Deadlift',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Deadlift with a 2–3 second pause just below the knee to reinforce position and eliminate momentum.',
+          instructions:
+            'Pull the bar off the floor normally. As the bar passes the shins and reaches just below the knee, stop and hold for 2–3 full seconds while maintaining your position. Then drive the hips through to lockout.',
+          muscles: [
+            { name: 'hamstrings', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'lower_back', primary: true },
+            { name: 'quadriceps', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Trap Bar Deadlift',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Deadlift using a hex/trap bar that allows a more upright torso and reduces spinal stress — great for building general strength and quad-dominant pulling.',
+          instructions:
+            'Stand inside a loaded trap bar, grip the handles. Set hips similarly to a squat, drive through the floor with legs while keeping the chest up. Lock out hips and knees simultaneously.',
+          muscles: [
+            { name: 'quadriceps', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'hamstrings', primary: false },
+            { name: 'lower_back', primary: false },
+            { name: 'traps', primary: false },
+          ],
+          equipment: ['trap_bar'],
+        },
+        {
+          name: 'Stiff Leg Deadlift',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Deadlift variation with minimal knee bend throughout, keeping tension on the hamstrings for the entire range of motion.',
+          instructions:
+            'Stand with feet hip-width, slight bend in knees (locked in throughout). Hinge at the hips and lower the bar along your legs, feeling a deep hamstring stretch. Drive hips through to return to standing.',
+          muscles: [
+            { name: 'hamstrings', primary: true },
+            { name: 'glutes', primary: false },
+            { name: 'lower_back', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+
+        // ── Powerlifting Accessories ──────────────────────────
+        {
+          name: 'Good Morning',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Barbell hip-hinge movement with the bar on the back, overloading the hamstrings and lower back — a foundational squat and deadlift accessory.',
+          instructions:
+            'Stand with a barbell on your upper traps (low or high bar). Push hips back while keeping a slight knee bend, lowering your torso until parallel (or as low as hamstring flexibility allows). Drive hips forward to return to standing.',
+          muscles: [
+            { name: 'hamstrings', primary: true },
+            { name: 'lower_back', primary: true },
+            { name: 'glutes', primary: false },
+            { name: 'core', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'Glute Ham Raise',
+          exerciseType: ExerciseType.strength,
+          description:
+            'GHR machine exercise that trains the hamstrings through both knee flexion and hip extension simultaneously — one of the most effective hamstring movements.',
+          instructions:
+            'Position feet in the GHR machine footplate, thighs on the pad. From a horizontal position, use hamstring and glute contraction to curl yourself up to vertical. Lower with control.',
+          muscles: [
+            { name: 'hamstrings', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'lower_back', primary: false },
+          ],
+          equipment: ['glute_ham_raise'],
+        },
+        {
+          name: 'Back Extension',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Hip hinge on a 45-degree back extension bench, targeting the erectors, glutes, and hamstrings.',
+          instructions:
+            'Position hips at the top of the pad on a 45-degree hyperextension bench, feet secured. Hinge forward until torso is near vertical, then drive hips into the pad and raise back to horizontal. Add a barbell across traps or plate at chest for loading.',
+          muscles: [
+            { name: 'lower_back', primary: true },
+            { name: 'glutes', primary: true },
+            { name: 'hamstrings', primary: false },
+          ],
+          equipment: ['bench'],
+        },
+        {
+          name: 'Pendlay Row',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Explosive barbell row from a dead stop on the floor each rep, demanding strict horizontal pull and building upper back strength for the deadlift.',
+          instructions:
+            'Stand over the bar with a flat back parallel to the floor. Grip bar at shoulder width. Explosively pull the bar to your lower chest, then lower it completely to the floor between reps — no swinging.',
+          muscles: [
+            { name: 'back', primary: true },
+            { name: 'lats', primary: true },
+            { name: 'traps', primary: true },
+            { name: 'biceps', primary: false },
+          ],
+          equipment: ['barbell'],
+        },
+        {
+          name: 'JM Press',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Hybrid between a skull crusher and a close-grip press, training the triceps at a longer length with heavier loads than traditional extensions.',
+          instructions:
+            'Lie on a bench with a close grip (slightly wider than skull crusher). Lower the bar in a straight vertical path to your chin/throat, elbows pointing slightly toward your feet (not flared). Press back by driving elbows up and forward.',
+          muscles: [
+            { name: 'triceps', primary: true },
+            { name: 'chest', primary: false },
+          ],
+          equipment: ['barbell', 'bench'],
+        },
+        {
+          name: 'Reverse Hyper',
+          exerciseType: ExerciseType.strength,
+          description:
+            'Reverse hyperextension machine movement that simultaneously decompresses the spine and strengthens the glutes, hamstrings, and lower back through a pendulum swing.',
+          instructions:
+            'Lie face-down on the reverse hyper platform, hips at the edge, and hook the strap/cable to your ankles. Swing the weight up by extending the hips, squeezing glutes at the top. Let it swing back under control without losing lumbar position.',
+          muscles: [
+            { name: 'glutes', primary: true },
+            { name: 'hamstrings', primary: true },
+            { name: 'lower_back', primary: true },
+          ],
+          equipment: ['reverse_hyper'],
+        },
       ];
 
       // Insert exercises with muscle group and equipment links
@@ -1404,6 +1749,7 @@ async function main(): Promise<void> {
             description: ex.description,
             instructions: ex.instructions,
             isCustom: false,
+            isCompetitionLift: ex.isCompetitionLift ?? false,
             muscleGroups: {
               create: ex.muscles.map((m) => ({
                 muscleGroupId: mg[m.name],
@@ -1420,70 +1766,133 @@ async function main(): Promise<void> {
         exercises[ex.name] = created.id;
       }
 
-      // ─── Workout Plan (Push/Pull/Legs) ──────────────────────
+      // ─── Workout Plan (Powerlifting 4-Day) ─────────────────
       await tx.workoutPlan.create({
         data: {
           userId: user.id,
-          name: 'Push Pull Legs',
-          description: 'Classic 3-day split targeting all major muscle groups',
+          name: 'Powerlifting 4-Day Strength',
+          description: 'SBD-focused 4-day plan with competition lifts and key accessories',
           isActive: true,
           scheduleType: ScheduleType.weekly,
+          weeksCount: 12,
           planDays: {
             create: [
               {
                 dayOfWeek: 1,
-                name: 'Push Day',
+                name: 'Squat Day',
                 sortOrder: 0,
                 exercises: {
                   create: [
                     {
-                      exerciseId: exercises['Barbell Bench Press'],
+                      exerciseId: exercises['Low Bar Back Squat'],
                       sortOrder: 0,
                       targetSets: 4,
+                      targetReps: '3-5',
+                      notes: 'Top set + back-off sets. Focus on depth and brace.',
+                    },
+                    {
+                      exerciseId: exercises['Pause Squat'],
+                      sortOrder: 1,
+                      targetSets: 3,
+                      targetReps: '3',
+                      notes: '3-second pause at the bottom. ~75% of top set.',
+                    },
+                    {
+                      exerciseId: exercises['Good Morning'],
+                      sortOrder: 2,
+                      targetSets: 3,
                       targetReps: '8-10',
                     },
                     {
-                      exerciseId: exercises['Overhead Press'],
-                      sortOrder: 1,
+                      exerciseId: exercises['Leg Press'],
+                      sortOrder: 3,
                       targetSets: 3,
-                      targetReps: '8-12',
+                      targetReps: '10-12',
                     },
                     {
-                      exerciseId: exercises['Tricep Pushdown'],
-                      sortOrder: 2,
+                      exerciseId: exercises['Leg Curl'],
+                      sortOrder: 4,
                       targetSets: 3,
-                      targetReps: '12-15',
+                      targetReps: '10-12',
                     },
                   ],
                 },
               },
               {
                 dayOfWeek: 3,
-                name: 'Pull Day',
+                name: 'Bench Day',
                 sortOrder: 1,
+                exercises: {
+                  create: [
+                    {
+                      exerciseId: exercises['Competition Bench Press'],
+                      sortOrder: 0,
+                      targetSets: 4,
+                      targetReps: '3-5',
+                      notes: 'Pause each rep on the chest. Competition-legal execution.',
+                    },
+                    {
+                      exerciseId: exercises['Close Grip Bench Press'],
+                      sortOrder: 1,
+                      targetSets: 3,
+                      targetReps: '6-8',
+                    },
+                    {
+                      exerciseId: exercises['Overhead Press'],
+                      sortOrder: 2,
+                      targetSets: 3,
+                      targetReps: '8-10',
+                    },
+                    {
+                      exerciseId: exercises['Tricep Pushdown'],
+                      sortOrder: 3,
+                      targetSets: 4,
+                      targetReps: '12-15',
+                    },
+                    {
+                      exerciseId: exercises['Face Pull'],
+                      sortOrder: 4,
+                      targetSets: 3,
+                      targetReps: '15-20',
+                      notes: 'Shoulder health — never skip.',
+                    },
+                  ],
+                },
+              },
+              {
+                dayOfWeek: 5,
+                name: 'Deadlift Day',
+                sortOrder: 2,
                 exercises: {
                   create: [
                     {
                       exerciseId: exercises['Conventional Deadlift'],
                       sortOrder: 0,
-                      targetSets: 3,
-                      targetReps: '5',
+                      targetSets: 4,
+                      targetReps: '2-4',
+                      notes: 'Top set + back-off. Reset between reps.',
                     },
                     {
-                      exerciseId: exercises['Barbell Row'],
+                      exerciseId: exercises['Romanian Deadlift'],
                       sortOrder: 1,
-                      targetSets: 4,
+                      targetSets: 3,
                       targetReps: '8-10',
                     },
                     {
-                      exerciseId: exercises['Pull-Up'],
+                      exerciseId: exercises['Pendlay Row'],
                       sortOrder: 2,
-                      targetSets: 3,
-                      targetReps: '6-10',
+                      targetSets: 4,
+                      targetReps: '5',
                     },
                     {
-                      exerciseId: exercises['Barbell Curl'],
+                      exerciseId: exercises['Back Extension'],
                       sortOrder: 3,
+                      targetSets: 3,
+                      targetReps: '12-15',
+                    },
+                    {
+                      exerciseId: exercises['Lat Pulldown'],
+                      sortOrder: 4,
                       targetSets: 3,
                       targetReps: '10-12',
                     },
@@ -1491,35 +1900,41 @@ async function main(): Promise<void> {
                 },
               },
               {
-                dayOfWeek: 5,
-                name: 'Leg Day',
-                sortOrder: 2,
+                dayOfWeek: 6,
+                name: 'Upper Accessory Day',
+                sortOrder: 3,
                 exercises: {
                   create: [
                     {
-                      exerciseId: exercises['Barbell Back Squat'],
+                      exerciseId: exercises['Pause Bench Press'],
                       sortOrder: 0,
                       targetSets: 4,
-                      targetReps: '6-8',
+                      targetReps: '4-6',
+                      notes: '2-second pause every rep. ~80% of competition bench.',
                     },
                     {
-                      exerciseId: exercises['Romanian Deadlift'],
+                      exerciseId: exercises['Incline Barbell Press'],
                       sortOrder: 1,
+                      targetSets: 3,
+                      targetReps: '8-10',
+                    },
+                    {
+                      exerciseId: exercises['Dumbbell Row'],
+                      sortOrder: 2,
+                      targetSets: 4,
+                      targetReps: '10-12',
+                    },
+                    {
+                      exerciseId: exercises['Skull Crusher'],
+                      sortOrder: 3,
                       targetSets: 3,
                       targetReps: '10-12',
                     },
                     {
-                      exerciseId: exercises['Plank'],
-                      sortOrder: 2,
+                      exerciseId: exercises['Barbell Curl'],
+                      sortOrder: 4,
                       targetSets: 3,
-                      targetDurationSec: 60,
-                    },
-                    {
-                      exerciseId: exercises['Running'],
-                      sortOrder: 3,
-                      targetSets: 1,
-                      targetDurationSec: 1200,
-                      targetDistanceM: 3000,
+                      targetReps: '10-12',
                     },
                   ],
                 },
@@ -1543,9 +1958,10 @@ async function main(): Promise<void> {
       const cardioCount = exerciseData.filter((e) => e.exerciseType === ExerciseType.cardio).length;
       const stretchingCount = exerciseData.filter((e) => e.exerciseType === ExerciseType.stretching).length;
 
+      const competitionLiftCount = exerciseData.filter((e) => e.isCompetitionLift).length;
       console.log('Seed completed successfully');
       console.log(
-        `Created: 2 users, ${muscleGroupData.length} muscle groups, ${equipmentData.length} equipment types, ${exerciseData.length} exercises (${strengthCount} strength, ${cardioCount} cardio, ${stretchingCount} stretching), 1 workout plan`,
+        `Created: 2 users, ${muscleGroupData.length} muscle groups, ${equipmentData.length} equipment types, ${exerciseData.length} exercises (${strengthCount} strength, ${cardioCount} cardio, ${stretchingCount} stretching, ${competitionLiftCount} competition lifts), 1 powerlifting plan`,
       );
     },
     { timeout: 60000 },
