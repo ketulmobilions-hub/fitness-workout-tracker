@@ -26,6 +26,14 @@ const exerciseProgressQuerySchema = z.object({
   period: z.enum(['1m', '3m', '6m', '1y', 'all']).default('3m'),
 });
 
+const oneRmParamsSchema = z.object({
+  exerciseId: z.string().uuid(),
+});
+
+const oneRmQuerySchema = z.object({
+  period: z.enum(['1m', '3m', '6m', '1y', 'all']).default('1y'),
+});
+
 const personalRecordsQuerySchema = z.object({
   exercise_id: z.string().uuid().optional(),
   record_type: z.enum(['max_weight', 'max_reps', 'max_volume', 'best_pace']).optional(),
@@ -43,6 +51,11 @@ router.get(
   '/exercise/:id',
   validate({ params: exerciseProgressParamsSchema, query: exerciseProgressQuerySchema }),
   progress.getExerciseProgress,
+);
+router.get(
+  '/1rm/:exerciseId',
+  validate({ params: oneRmParamsSchema, query: oneRmQuerySchema }),
+  progress.get1RmHistory,
 );
 router.get('/personal-records', validate({ query: personalRecordsQuerySchema }), progress.getPersonalRecords);
 router.get('/volume', validate({ query: volumeQuerySchema }), progress.getVolume);

@@ -2,6 +2,8 @@ import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/utils/one_rm_utils.dart';
+
 import '../../../../core/router/app_routes.dart';
 import '../../providers/active_session_notifier.dart';
 
@@ -24,6 +26,7 @@ class WorkoutSummaryScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final exercisesWithSets =
         summary.exerciseData.where((e) => e.loggedSets.isNotEmpty).toList();
+    final bestOneRm = bestSessionOneRepMax(summary);
 
     return Scaffold(
       appBar: AppBar(
@@ -91,6 +94,63 @@ class WorkoutSummaryScreen extends StatelessWidget {
               ),
             ),
           ),
+
+          // ── Best 1RM ─────────────────────────────────────────────────────
+          if (bestOneRm != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calculate_outlined,
+                        color: theme.colorScheme.onSecondaryContainer,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Best Est. 1RM',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSecondaryContainer
+                                    .withValues(alpha: 0.7),
+                              ),
+                            ),
+                            Text(
+                              bestOneRm.exerciseName,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '${bestOneRm.estimatedOneRepMax.toStringAsFixed(1)} kg',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // ── New PRs ──────────────────────────────────────────────────────
           if (summary.newPRs.isNotEmpty) ...[
