@@ -221,7 +221,7 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<WorkoutSession> startSession({
+  Future<SessionStartResult> startSession({
     String? planId,
     String? planDayId,
     DateTime? startedAt,
@@ -250,23 +250,25 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
 
     // ── Sync to server (best-effort) ─────────────────────────────────────────
     try {
-      final dto = (await _apiClient.startSession(StartSessionRequestDto(
+      final responseData = (await _apiClient.startSession(StartSessionRequestDto(
         planId: planId,
         planDayId: planDayId,
         startedAt: startTime.toIso8601String(),
       )))
-          .data
-          .session;
+          .data;
 
       // Replace the local stub with the server-assigned row.
       // This is safe — no child exercise_log rows exist yet at session start,
       // so there are no FK constraints to violate.
       await _dao.transaction(() async {
         await _dao.deleteSession(localId);
-        await _dao.upsertSession(_sessionDtoToCompanion(dto));
+        await _dao.upsertSession(_sessionDtoToCompanion(responseData.session));
       });
 
-      return _dtoToSession(dto);
+      return SessionStartResult(
+        session: _dtoToSession(responseData.session),
+        suggestedWeights: Map<String, double>.from(responseData.suggestedWeights),
+      );
     } catch (e) {
       debugPrint('WorkoutSessionRepository: startSession server sync failed: $e');
       // Enqueue so the sync engine retries when connectivity returns.
@@ -285,15 +287,20 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
       );
     }
 
-    return WorkoutSession(
-      id: localId,
-      userId: _userId,
-      planId: planId,
-      planDayId: planDayId,
-      startedAt: startTime,
-      status: SessionStatus.inProgress,
-      createdAt: now,
-      updatedAt: now,
+    // suggestedWeights are intentionally empty in the offline path — the server
+    // computes them from personal records at session start time. They will
+    // appear on the next session started while online.
+    return SessionStartResult(
+      session: WorkoutSession(
+        id: localId,
+        userId: _userId,
+        planId: planId,
+        planDayId: planDayId,
+        startedAt: startTime,
+        status: SessionStatus.inProgress,
+        createdAt: now,
+        updatedAt: now,
+      ),
     );
   }
 

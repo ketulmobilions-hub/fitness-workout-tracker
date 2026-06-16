@@ -18,6 +18,7 @@ class ActiveExerciseData {
     this.exerciseLogId,
     this.loggedSets = const [],
     this.previousSessions = const [],
+    this.suggestedWeightKg,
   });
 
   /// The exercise as planned (with targets). For ad-hoc exercises added
@@ -33,6 +34,10 @@ class ActiveExerciseData {
   /// Set logs from the last 3 prior completed sessions (newest first).
   final List<PreviousSessionData> previousSessions;
 
+  /// Server-computed suggested weight in kg (PR × targetWeightPct1rm).
+  /// Null when no 1RM target is set or the user has no max_weight PR.
+  final double? suggestedWeightKg;
+
   ActiveExerciseData copyWith({
     String? exerciseLogId,
     List<SetLog>? loggedSets,
@@ -43,6 +48,7 @@ class ActiveExerciseData {
         exerciseLogId: exerciseLogId ?? this.exerciseLogId,
         loggedSets: loggedSets ?? this.loggedSets,
         previousSessions: previousSessions ?? this.previousSessions,
+        suggestedWeightKg: suggestedWeightKg,
       );
 }
 
@@ -163,30 +169,32 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
     final repo = ref.read(workoutSessionRepositoryProvider);
 
     try {
-      final session = await repo.startSession(
+      final result = await repo.startSession(
         planId: planId,
         planDayId: planDayId,
       );
 
-      _sessionStartTime = session.startedAt;
+      _sessionStartTime = result.session.startedAt;
 
       // Load previous sessions for each exercise in parallel.
       final previousSessions = await Future.wait(
         exercises.map((ex) => repo
             .getPreviousSessions(
               exerciseId: ex.exerciseId,
-              excludeSessionId: session.id,
+              excludeSessionId: result.session.id,
             )
             .catchError((_) => <PreviousSessionData>[])),
       );
 
       state = ActiveSessionState(
-        session: session,
+        session: result.session,
         exerciseData: List.generate(
           exercises.length,
           (i) => ActiveExerciseData(
             planExercise: exercises[i],
             previousSessions: previousSessions[i],
+            suggestedWeightKg:
+                result.suggestedWeights[exercises[i].exerciseId],
           ),
         ),
       );

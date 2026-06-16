@@ -33,6 +33,7 @@ type MappedPlanDayExercise = {
   targetReps: string | null;
   targetDurationSec: number | null;
   targetDistanceM: number | null;
+  targetWeightPct1rm: number | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -89,6 +90,7 @@ function mapPlanDayExercise(entry: ExerciseEntry): MappedPlanDayExercise {
     targetReps: entry.targetReps,
     targetDurationSec: entry.targetDurationSec,
     targetDistanceM: entry.targetDistanceM,
+    targetWeightPct1rm: entry.targetWeightPct1rm,
     notes: entry.notes,
     createdAt: entry.createdAt.toISOString(),
     updatedAt: entry.updatedAt.toISOString(),
@@ -319,6 +321,7 @@ export const addExercise = async (_req: Request, res: Response): Promise<void> =
     targetReps?: string;
     targetDurationSec?: number;
     targetDistanceM?: number;
+    targetWeightPct1rm?: number;
     notes?: string;
   };
   const { userId } = res.locals.auth!;
@@ -371,6 +374,7 @@ export const addExercise = async (_req: Request, res: Response): Promise<void> =
         targetReps: body.targetReps ?? null,
         targetDurationSec: body.targetDurationSec ?? null,
         targetDistanceM: body.targetDistanceM ?? null,
+        targetWeightPct1rm: body.targetWeightPct1rm ?? null,
         notes: body.notes ?? null,
       },
       include: { exercise: true },
@@ -453,6 +457,7 @@ export const updateExercise = async (_req: Request, res: Response): Promise<void
     targetReps?: string;
     targetDurationSec?: number;
     targetDistanceM?: number;
+    targetWeightPct1rm?: number | null;
     notes?: string | null;
   };
   const { userId } = res.locals.auth!;
@@ -498,6 +503,7 @@ export const updateExercise = async (_req: Request, res: Response): Promise<void
         }),
         ...(body.targetDistanceM !== undefined && { targetDistanceM: body.targetDistanceM }),
         // Use 'in' check so that explicitly passing null clears the field.
+        ...('targetWeightPct1rm' in body && { targetWeightPct1rm: body.targetWeightPct1rm }),
         ...('notes' in body && { notes: body.notes }),
       },
       include: { exercise: true },

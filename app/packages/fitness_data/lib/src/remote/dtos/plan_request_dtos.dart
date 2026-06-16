@@ -66,6 +66,7 @@ abstract class AddPlanExerciseRequestDto with _$AddPlanExerciseRequestDto {
     @JsonKey(includeIfNull: false) String? targetReps,
     @JsonKey(includeIfNull: false) int? targetDurationSec,
     @JsonKey(includeIfNull: false) double? targetDistanceM,
+    @JsonKey(includeIfNull: false) double? targetWeightPct1rm,
     @JsonKey(includeIfNull: false) String? notes,
   }) = _AddPlanExerciseRequestDto;
 
@@ -86,6 +87,8 @@ abstract class UpdatePlanExerciseRequestDto
     @JsonKey(includeIfNull: false) String? targetReps,
     @JsonKey(includeIfNull: false) int? targetDurationSec,
     @JsonKey(includeIfNull: false) double? targetDistanceM,
+    // targetWeightPct1rm can be null to clear the field — includeIfNull: true.
+    double? targetWeightPct1rm,
     // notes can be explicitly set to null to clear the field — use
     // includeIfNull: true here so a null notes IS sent over the wire.
     String? notes,

@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -115,6 +115,12 @@ class AppDatabase extends _$AppDatabase {
           // updated schema and copies all rows — SQLite's type affinity ensures
           // existing integer rpe values are read back correctly as doubles.
           await m.alterTable(TableMigration(setLogs));
+        }
+        if (from < 4) {
+          // Add target_weight_pct_1rm to plan_day_exercises for % of 1RM
+          // auto-suggest. Stored as decimal 0.5–1.0; null = not set.
+          await m.addColumn(
+              planDayExercises, planDayExercises.targetWeightPct1rm);
         }
       },
     );

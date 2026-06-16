@@ -425,6 +425,20 @@ class _ExerciseLogger extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (exerciseData.suggestedWeightKg != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _suggestedWeightLabel(
+                        exerciseData.suggestedWeightKg!,
+                        ex.targetWeightPct1rm,
+                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 if (ex.notes != null && ex.notes!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -515,6 +529,19 @@ class _ExerciseLogger extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// Returns "Suggested: 147.5 kg (85% of 1RM)" label for the hint row.
+  String _suggestedWeightLabel(double kg, double? pct1rm) {
+    final kgStr = kg == kg.truncateToDouble()
+        ? '${kg.toInt()} kg'
+        : '${kg.toStringAsFixed(1)} kg';
+    if (pct1rm == null) return 'Suggested: $kgStr';
+    final pct = pct1rm * 100;
+    final pctStr = pct == pct.truncateToDouble()
+        ? '${pct.toInt()}%'
+        : '${pct.toStringAsFixed(1)}%';
+    return 'Suggested: $kgStr ($pctStr of 1RM)';
   }
 
   /// Returns a target string for the exercise header, or null if no targets.

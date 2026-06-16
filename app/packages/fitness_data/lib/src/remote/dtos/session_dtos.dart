@@ -75,6 +75,33 @@ abstract class SessionDetailDto with _$SessionDetailDto {
 }
 
 // ---------------------------------------------------------------------------
+// Start session response: { "status": 201, "data": { "session": {...}, "suggestedWeights": {...} } }
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class StartSessionDataDto with _$StartSessionDataDto {
+  const factory StartSessionDataDto({
+    required SessionDetailDto session,
+    // exerciseId → suggested weight in kg based on PR × targetWeightPct1rm
+    @Default(<String, double>{}) Map<String, double> suggestedWeights,
+  }) = _StartSessionDataDto;
+
+  factory StartSessionDataDto.fromJson(Map<String, dynamic> json) =>
+      _$StartSessionDataDtoFromJson(json);
+}
+
+@freezed
+abstract class StartSessionEnvelopeDto with _$StartSessionEnvelopeDto {
+  const factory StartSessionEnvelopeDto({
+    required int status,
+    required StartSessionDataDto data,
+  }) = _StartSessionEnvelopeDto;
+
+  factory StartSessionEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$StartSessionEnvelopeDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
 // Session detail envelope: { "status": 200, "data": { "session": {...} } }
 // ---------------------------------------------------------------------------
 
