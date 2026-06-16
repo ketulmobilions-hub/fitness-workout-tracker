@@ -490,6 +490,7 @@ class _ExerciseLogger extends StatelessWidget {
                     setNumber: nextSetNumber,
                     previousWeight: prevRef?.weightKg,
                     previousReps: prevRef?.reps,
+                    previousTempo: lastSet?.tempo,
                     targetReps: ex.targetReps,
                     targetSets: ex.targetSets,
                     onLog: ({
