@@ -589,16 +589,23 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
   }
 
   @override
-  Future<List<SetLog>> getPreviousSets({
+  Future<List<PreviousSessionData>> getPreviousSessions({
     required String exerciseId,
     String? excludeSessionId,
+    int limit = 3,
   }) async {
-    final rows = await _dao.getPreviousSetsForExercise(
+    final sessions = await _dao.getPreviousSessionsForExercise(
       userId: _userId,
       exerciseId: exerciseId,
       excludeSessionId: excludeSessionId,
+      limit: limit,
     );
-    return rows.map(_rowToSetLog).toList();
+    return sessions
+        .map((s) => PreviousSessionData(
+              sessionDate: s.sessionDate.toLocal(),
+              sets: s.sets.map(_rowToSetLog).toList(),
+            ))
+        .toList();
   }
 
   // ---------------------------------------------------------------------------

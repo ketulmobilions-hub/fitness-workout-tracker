@@ -324,4 +324,103 @@ class WorkoutSessionDao extends DatabaseAccessor<AppDatabase>
           ..orderBy([(t) => OrderingTerm.asc(t.setNumber)]))
         .get();
   }
+
+  /// Returns set logs from the last [limit] completed sessions in which
+  /// [exerciseId] was performed by [userId].
+  ///
+  /// Returns one record per session, ordered newest first. Each record holds
+  /// the session date and all sets for that exercise in that session.
+  /// Three queries total regardless of [limit] — no N+1.
+  Future<List<({DateTime sessionDate, List<SetLogRow> sets})>>
+      getPreviousSessionsForExercise({
+    required String userId,
+    required String exerciseId,
+    String? excludeSessionId,
+    int limit = 3,
+  }) async {
+    // Step 1 — find the last N *distinct* completed sessions that included this
+    // exercise. GROUP BY ensures limit() applies to unique sessions, not to raw
+    // join rows (Bug 2 fix: a session with 2 exercise_log rows for this exercise
+    // would otherwise consume 2 limit slots, returning fewer sessions than asked).
+    final excludeClause =
+        excludeSessionId != null ? 'AND ws.id != ?' : '';
+    final sessionQuery = customSelect(
+      '''
+      SELECT ws.id, ws.started_at
+      FROM workout_sessions ws
+      INNER JOIN exercise_logs el ON el.session_id = ws.id
+      WHERE ws.user_id = ?
+        AND el.exercise_id = ?
+        AND ws.status = ?
+        $excludeClause
+      GROUP BY ws.id, ws.started_at
+      ORDER BY ws.started_at DESC
+      LIMIT ?
+      ''',
+      variables: [
+        Variable.withString(userId),
+        Variable.withString(exerciseId),
+        Variable.withString(
+            const SessionStatusConverter().toSql(SessionStatus.completed)),
+        if (excludeSessionId != null) Variable.withString(excludeSessionId),
+        Variable.withInt(limit),
+      ],
+      readsFrom: {workoutSessions, exerciseLogs},
+    );
+
+    final sessionRows = await sessionQuery.get();
+    if (sessionRows.isEmpty) return [];
+
+    // Drift stores DateTime as INTEGER milliseconds since Unix epoch (default,
+    // no dateTimeAsText option in this project).
+    final sessions = sessionRows
+        .map((row) => (
+              id: row.read<String>('id'),
+              date: DateTime.fromMillisecondsSinceEpoch(
+                  row.read<int>('started_at')),
+            ))
+        .toList();
+
+    final sessionIds = sessions.map((s) => s.id).toList();
+
+    // Step 2 — fetch ALL exercise logs for these sessions + exercise in one
+    // query. An exercise may appear more than once per session (user removed
+    // and re-added), so multiple rows per session are intentional.
+    final logRows = await (select(exerciseLogs)
+          ..where((t) =>
+              t.sessionId.isIn(sessionIds) & t.exerciseId.equals(exerciseId)))
+        .get();
+    if (logRows.isEmpty) return [];
+
+    // Step 3 — fetch all set logs for those exercise logs in one query.
+    final exerciseLogIds = logRows.map((l) => l.id).toList();
+    final allSets = await (select(setLogs)
+          ..where((t) => t.exerciseLogId.isIn(exerciseLogIds))
+          ..orderBy([(t) => OrderingTerm.asc(t.setNumber)]))
+        .get();
+
+    // Group sets by exercise log ID.
+    final setsByLogId = <String, List<SetLogRow>>{};
+    for (final set in allSets) {
+      (setsByLogId[set.exerciseLogId] ??= []).add(set);
+    }
+
+    // Map session ID → all exercise log IDs for that session.
+    // Bug 1 fix: collect into a list instead of overwriting — merges sets from
+    // all exercise_log rows when the same exercise was logged more than once.
+    final logIdsBySessionId = <String, List<String>>{};
+    for (final log in logRows) {
+      (logIdsBySessionId[log.sessionId] ??= []).add(log.id);
+    }
+
+    return sessions.map((s) {
+      final logIds = logIdsBySessionId[s.id] ?? <String>[];
+      // Merge sets from all exercise logs for this session, keep set_number order.
+      final sets = logIds
+          .expand((id) => setsByLogId[id] ?? <SetLogRow>[])
+          .toList()
+        ..sort((a, b) => a.setNumber.compareTo(b.setNumber));
+      return (sessionDate: s.date, sets: sets);
+    }).toList();
+  }
 }

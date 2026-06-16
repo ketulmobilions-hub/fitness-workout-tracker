@@ -382,13 +382,16 @@ class _ExerciseLogger extends StatelessWidget {
     final bool useDurationInput = ex.exerciseType != ExerciseType.strength;
     final targetLabel = _targetLabel(ex);
 
-    // Fix #7: for the first set in a session, pre-fill from the previous
-    // session's reference sets so the user can see a concrete starting point.
-    // For subsequent sets, use the most recently logged set in this session.
-    final prevRef = lastSet ??
-        (exerciseData.previousSets.isNotEmpty
-            ? exerciseData.previousSets.first
-            : null);
+    // Fix #7: for the first set in a session, pre-fill from the most recent
+    // previous session's top working set so the user sees a concrete starting
+    // point. For subsequent sets, use the most recently logged set in this session.
+    // Bug 3 fix: never fall back to a warmup set — if all prior sets were
+    // warmups topWorkingSet is null and we leave the fields empty instead of
+    // pre-filling with a warmup weight that would mislead the user.
+    final prevSession = exerciseData.previousSessions.isNotEmpty
+        ? exerciseData.previousSessions.first
+        : null;
+    final prevRef = lastSet ?? prevSession?.topWorkingSet;
 
     return CustomScrollView(
       slivers: [
@@ -441,7 +444,7 @@ class _ExerciseLogger extends StatelessWidget {
         // Previous performance
         SliverToBoxAdapter(
           child: PreviousPerformanceCard(
-            previousSets: exerciseData.previousSets,
+            previousSessions: exerciseData.previousSessions,
             exerciseType: ex.exerciseType,
           ),
         ),

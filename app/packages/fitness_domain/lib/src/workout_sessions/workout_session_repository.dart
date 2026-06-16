@@ -1,3 +1,4 @@
+import 'previous_session_data.dart';
 import 'workout_session.dart';
 import 'workout_session_summary.dart';
 
@@ -50,11 +51,12 @@ abstract class WorkoutSessionRepository {
   /// Marks the session as abandoned and persists that state locally.
   Future<void> abandonSession(String sessionId);
 
-  /// Returns the set logs from the most recent completed session in which
+  /// Returns set logs from the last [limit] completed sessions in which
   /// [exerciseId] was performed. Used to display previous performance.
-  Future<List<SetLog>> getPreviousSets({
+  Future<List<PreviousSessionData>> getPreviousSessions({
     required String exerciseId,
     String? excludeSessionId,
+    int limit = 3,
   });
 
   /// Streams summary data for all completed sessions, newest first.

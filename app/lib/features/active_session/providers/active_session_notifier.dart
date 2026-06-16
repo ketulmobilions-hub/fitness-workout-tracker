@@ -17,7 +17,7 @@ class ActiveExerciseData {
     required this.planExercise,
     this.exerciseLogId,
     this.loggedSets = const [],
-    this.previousSets = const [],
+    this.previousSessions = const [],
   });
 
   /// The exercise as planned (with targets). For ad-hoc exercises added
@@ -30,19 +30,19 @@ class ActiveExerciseData {
   /// Sets logged so far in this session for this exercise.
   final List<SetLog> loggedSets;
 
-  /// Sets logged in the most recent prior completed session (for reference).
-  final List<SetLog> previousSets;
+  /// Set logs from the last 3 prior completed sessions (newest first).
+  final List<PreviousSessionData> previousSessions;
 
   ActiveExerciseData copyWith({
     String? exerciseLogId,
     List<SetLog>? loggedSets,
-    List<SetLog>? previousSets,
+    List<PreviousSessionData>? previousSessions,
   }) =>
       ActiveExerciseData(
         planExercise: planExercise,
         exerciseLogId: exerciseLogId ?? this.exerciseLogId,
         loggedSets: loggedSets ?? this.loggedSets,
-        previousSets: previousSets ?? this.previousSets,
+        previousSessions: previousSessions ?? this.previousSessions,
       );
 }
 
@@ -170,14 +170,14 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
 
       _sessionStartTime = session.startedAt;
 
-      // Load previous sets for each exercise in parallel.
-      final previousSets = await Future.wait(
+      // Load previous sessions for each exercise in parallel.
+      final previousSessions = await Future.wait(
         exercises.map((ex) => repo
-            .getPreviousSets(
+            .getPreviousSessions(
               exerciseId: ex.exerciseId,
               excludeSessionId: session.id,
             )
-            .catchError((_) => <SetLog>[])),
+            .catchError((_) => <PreviousSessionData>[])),
       );
 
       state = ActiveSessionState(
@@ -186,7 +186,7 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
           exercises.length,
           (i) => ActiveExerciseData(
             planExercise: exercises[i],
-            previousSets: previousSets[i],
+            previousSessions: previousSessions[i],
           ),
         ),
       );
@@ -338,19 +338,19 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
       sortOrder: current.exerciseData.length,
     );
 
-    final previousSets = await ref
+    final previousSessions = await ref
         .read(workoutSessionRepositoryProvider)
-        .getPreviousSets(
+        .getPreviousSessions(
           exerciseId: exercise.id,
           excludeSessionId: current.session.id,
         )
-        .catchError((_) => <SetLog>[]);
+        .catchError((_) => <PreviousSessionData>[]);
 
     final updatedData = [
       ...current.exerciseData,
       ActiveExerciseData(
         planExercise: planExercise,
-        previousSets: previousSets,
+        previousSessions: previousSessions,
       ),
     ];
 
@@ -374,18 +374,18 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
       sortOrder: current.currentExerciseIndex,
     );
 
-    final previousSets = await ref
+    final previousSessions = await ref
         .read(workoutSessionRepositoryProvider)
-        .getPreviousSets(
+        .getPreviousSessions(
           exerciseId: exercise.id,
           excludeSessionId: current.session.id,
         )
-        .catchError((_) => <SetLog>[]);
+        .catchError((_) => <PreviousSessionData>[]);
 
     final updatedData = List<ActiveExerciseData>.from(current.exerciseData);
     updatedData[current.currentExerciseIndex] = ActiveExerciseData(
       planExercise: planExercise,
-      previousSets: previousSets,
+      previousSessions: previousSessions,
     );
 
     state = current.copyWith(exerciseData: updatedData);
