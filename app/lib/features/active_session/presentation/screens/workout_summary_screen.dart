@@ -249,7 +249,11 @@ class WorkoutSummaryScreen extends StatelessWidget {
       parts.add(w == w.truncateToDouble() ? '${w.toInt()} kg' : '$w kg');
     }
     if (set.reps != null) parts.add('× ${set.reps}');
-    if (set.rpe != null) parts.add('RPE ${set.rpe}');
+    if (set.rpe != null) {
+      final r = set.rpe!;
+      final label = r == r.truncateToDouble() ? r.toInt().toString() : r.toString();
+      parts.add('@$label');
+    }
     if (parts.isEmpty && set.durationSec != null) parts.add('${set.durationSec}s');
     return parts.isEmpty ? '—' : parts.join('  ');
   }

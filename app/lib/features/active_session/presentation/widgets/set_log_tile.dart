@@ -2,6 +2,44 @@ import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// RPE values available in the quick-select picker (6–10, 0.5 steps).
+const _rpeValues = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0];
+
+Color _rpeBadgeColor(double rpe) {
+  if (rpe >= 10) return Colors.red.shade700;
+  if (rpe >= 9) return Colors.orange.shade700;
+  if (rpe >= 8) return Colors.amber.shade700;
+  return Colors.green.shade700;
+}
+
+String _formatRpe(double rpe) =>
+    rpe == rpe.truncateToDouble() ? rpe.toInt().toString() : rpe.toString();
+
+/// Colored "@RPE" badge used on completed set tiles and history rows.
+class RpeBadge extends StatelessWidget {
+  const RpeBadge({super.key, required this.rpe});
+
+  final double rpe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _rpeBadgeColor(rpe),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '@${_formatRpe(rpe)}',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+    );
+  }
+}
+
 /// Displays a single logged set with a swipe-to-delete affordance.
 class LoggedSetTile extends StatelessWidget {
   const LoggedSetTile({
@@ -12,16 +50,11 @@ class LoggedSetTile extends StatelessWidget {
   });
 
   final SetLog set;
-  // Fix #12: exercise type drives the display format rather than relying on
-  // which fields happen to be populated (field-presence heuristic).
   final ExerciseType exerciseType;
-  // Fix #6: async callback so confirmDismiss can await the delete and keep
-  // the tile visible on failure rather than silently disappearing.
   final Future<void> Function() onDelete;
 
   String _summary() {
     if (exerciseType != ExerciseType.strength) {
-      // Cardio / stretching: distance · duration · pace · HR
       final parts = <String>[];
       if (set.distanceM != null) {
         final km = set.distanceM! / 1000;
@@ -38,18 +71,16 @@ class LoggedSetTile extends StatelessWidget {
         parts.add('$paceMin:${paceSec.toString().padLeft(2, '0')}/km');
       }
       if (set.heartRate != null) parts.add('HR ${set.heartRate}');
-      if (set.rpe != null) parts.add('RPE ${set.rpe}');
       return parts.isEmpty ? '—' : parts.join('  ·  ');
     }
 
-    // Strength: weight × reps, RPE, tempo
+    // Strength: weight × reps (RPE shown as badge separately)
     final parts = <String>[];
     if (set.weightKg != null) {
       final w = set.weightKg!;
       parts.add(w == w.truncateToDouble() ? '${w.toInt()} kg' : '$w kg');
     }
     if (set.reps != null) parts.add('× ${set.reps}');
-    if (set.rpe != null) parts.add('RPE ${set.rpe}');
     if (set.tempo != null && set.tempo!.isNotEmpty) parts.add(set.tempo!);
     if (parts.isEmpty && set.durationSec != null) parts.add('${set.durationSec}s');
     return parts.isEmpty ? '—' : parts.join('  ');
@@ -69,12 +100,7 @@ class LoggedSetTile extends StatelessWidget {
         child: Icon(Icons.delete_outline,
             color: theme.colorScheme.onErrorContainer),
       ),
-      // Fix #6: await the async delete before confirming dismissal. If the
-      // delete fails, return false so the tile snaps back and the user sees
-      // an error — prevents "ghost sets" reappearing from a failed DB write.
       confirmDismiss: (_) async {
-        // Capture messenger before the await to avoid using BuildContext
-        // across an async gap (use_build_context_synchronously).
         final messenger = ScaffoldMessenger.of(context);
         try {
           await onDelete();
@@ -108,8 +134,15 @@ class LoggedSetTile extends StatelessWidget {
           ),
         ),
         title: Text(_summary(), style: theme.textTheme.bodyMedium),
-        trailing: set.isWarmup
-            ? Container(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (set.rpe != null) ...[
+              RpeBadge(rpe: set.rpe!),
+              const SizedBox(width: 6),
+            ],
+            if (set.isWarmup)
+              Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -123,14 +156,17 @@ class LoggedSetTile extends StatelessWidget {
                   ),
                 ),
               )
-            : const Icon(Icons.check_circle, color: Colors.green, size: 20),
+            else
+              const Icon(Icons.check_circle, color: Colors.green, size: 20),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Form for entering a new set. Calls [onLog] when the user taps the
-/// checkmark. Pre-fills weight and reps from the last logged set for convenience.
+/// Form for entering a new set. RPE is a first-class quick-select picker
+/// (6–10, 0.5 steps). Calls [onLog] when the user taps the checkmark.
 class SetInputRow extends StatefulWidget {
   const SetInputRow({
     super.key,
@@ -146,7 +182,7 @@ class SetInputRow extends StatefulWidget {
   final void Function({
     int? reps,
     double? weightKg,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool isWarmup,
   }) onLog;
@@ -162,8 +198,8 @@ class SetInputRow extends StatefulWidget {
 class _SetInputRowState extends State<SetInputRow> {
   late final TextEditingController _weightCtrl;
   late final TextEditingController _repsCtrl;
-  final TextEditingController _rpeCtrl = TextEditingController();
   final TextEditingController _tempoCtrl = TextEditingController();
+  double? _selectedRpe;
   bool _isWarmup = false;
   bool _showAdvanced = false;
 
@@ -186,7 +222,6 @@ class _SetInputRowState extends State<SetInputRow> {
   void dispose() {
     _weightCtrl.dispose();
     _repsCtrl.dispose();
-    _rpeCtrl.dispose();
     _tempoCtrl.dispose();
     super.dispose();
   }
@@ -194,19 +229,20 @@ class _SetInputRowState extends State<SetInputRow> {
   void _submit() {
     final weightKg = double.tryParse(_weightCtrl.text.trim());
     final reps = int.tryParse(_repsCtrl.text.trim());
-    final rpe = int.tryParse(_rpeCtrl.text.trim());
     final tempo = _tempoCtrl.text.trim();
     widget.onLog(
       reps: reps,
       weightKg: weightKg,
-      rpe: rpe,
+      rpe: _selectedRpe,
       tempo: tempo.isEmpty ? null : tempo,
       isWarmup: _isWarmup,
     );
-    // Clear fields after logging.
-    _rpeCtrl.clear();
+    setState(() {
+      _selectedRpe = null;
+      _showAdvanced = false;
+      _isWarmup = false;
+    });
     _tempoCtrl.clear();
-    setState(() => _showAdvanced = false);
   }
 
   @override
@@ -220,6 +256,7 @@ class _SetInputRowState extends State<SetInputRow> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Weight × reps row ───────────────────────────────────────────
             Row(
               children: [
                 Container(
@@ -267,18 +304,17 @@ class _SetInputRowState extends State<SetInputRow> {
                 ),
               ],
             ),
+            // ── RPE quick-select ─────────────────────────────────────────────
+            const SizedBox(height: 10),
+            RpeQuickSelect(
+              selected: _selectedRpe,
+              onSelect: (v) => setState(() => _selectedRpe = v),
+            ),
+            // ── Advanced: tempo + warm-up ────────────────────────────────────
             if (_showAdvanced) ...[
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: _NumberField(
-                      controller: _rpeCtrl,
-                      label: 'RPE (1-10)',
-                      decimal: false,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _tempoCtrl,
@@ -290,17 +326,13 @@ class _SetInputRowState extends State<SetInputRow> {
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
+                  const SizedBox(width: 12),
                   Checkbox(
                     value: _isWarmup,
                     onChanged: (v) => setState(() => _isWarmup = v ?? false),
                     visualDensity: VisualDensity.compact,
                   ),
-                  Text('Warm-up set', style: theme.textTheme.bodySmall),
+                  Text('Warm-up', style: theme.textTheme.bodySmall),
                 ],
               ),
             ],
@@ -308,13 +340,10 @@ class _SetInputRowState extends State<SetInputRow> {
               onPressed: () =>
                   setState(() => _showAdvanced = !_showAdvanced),
               icon: Icon(
-                _showAdvanced
-                    ? Icons.expand_less
-                    : Icons.expand_more,
+                _showAdvanced ? Icons.expand_less : Icons.expand_more,
                 size: 16,
               ),
-              label:
-                  Text(_showAdvanced ? 'Hide options' : 'RPE / Tempo / Warm-up'),
+              label: Text(_showAdvanced ? 'Hide options' : 'Tempo / Warm-up'),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,
@@ -323,6 +352,92 @@ class _SetInputRowState extends State<SetInputRow> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Horizontal RPE quick-select strip (6–10, 0.5 steps).
+/// Public so it can be reused in other input forms (e.g. cardio).
+class RpeQuickSelect extends StatelessWidget {
+  const RpeQuickSelect({super.key, required this.selected, required this.onSelect});
+
+  final double? selected;
+  final void Function(double?) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'RPE',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 4),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _rpeValues.map((v) {
+              final isSelected = selected == v;
+              final color = _rpeBadgeColor(v);
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: GestureDetector(
+                  onTap: () => onSelect(isSelected ? null : v),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isSelected ? color : color.withAlpha(30),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? color : color.withAlpha(80),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      '@${_formatRpe(v)}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isSelected ? Colors.white : color,
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Allows digits and at most one decimal point.
+class _SingleDotFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue old, TextEditingValue value) {
+    final text = value.text;
+    if (text.isEmpty) return value;
+    // Strip anything that isn't a digit or dot.
+    final cleaned = text.replaceAll(RegExp(r'[^0-9.]'), '');
+    // Keep only the first dot.
+    final firstDot = cleaned.indexOf('.');
+    final sanitised = firstDot == -1
+        ? cleaned
+        : cleaned.substring(0, firstDot + 1) +
+            cleaned.substring(firstDot + 1).replaceAll('.', '');
+    if (sanitised == text) return value;
+    return value.copyWith(
+      text: sanitised,
+      selection: TextSelection.collapsed(offset: sanitised.length),
     );
   }
 }
@@ -345,9 +460,10 @@ class _NumberField extends StatelessWidget {
       keyboardType:
           TextInputType.numberWithOptions(decimal: decimal, signed: false),
       inputFormatters: [
-        FilteringTextInputFormatter.allow(
-          decimal ? RegExp(r'[0-9.]') : RegExp(r'[0-9]'),
-        ),
+        if (decimal)
+          _SingleDotFormatter()
+        else
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
       ],
       decoration: InputDecoration(
         labelText: label,

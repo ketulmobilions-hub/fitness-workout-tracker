@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -108,6 +108,13 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(planDays, planDays.updatedAt);
           await m.addColumn(planDayExercises, planDayExercises.createdAt);
           await m.addColumn(planDayExercises, planDayExercises.updatedAt);
+        }
+        if (from < 3) {
+          // set_logs.rpe changed from IntColumn to RealColumn to support 0.5
+          // RPE increments. Drift's TableMigration recreates the table with the
+          // updated schema and copies all rows — SQLite's type affinity ensures
+          // existing integer rpe values are read back correctly as doubles.
+          await m.alterTable(TableMigration(setLogs));
         }
       },
     );

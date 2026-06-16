@@ -113,7 +113,7 @@ abstract class SyncSetLogDto with _$SyncSetLogDto {
     double? distanceM,
     double? paceSecPerKm,
     int? heartRate,
-    int? rpe,
+    double? rpe,
     String? tempo,
     @Default(false) bool isWarmup,
     String? completedAt,

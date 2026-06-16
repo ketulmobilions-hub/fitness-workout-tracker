@@ -26,7 +26,7 @@ abstract class LogSetRequestDto with _$LogSetRequestDto {
     double? distanceM,
     double? paceSecPerKm,
     int? heartRate,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool? isWarmup,
     String? completedAt,

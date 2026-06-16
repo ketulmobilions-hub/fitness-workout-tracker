@@ -60,7 +60,7 @@ class _ActiveWorkoutBodyState extends ConsumerState<_ActiveWorkoutBody> {
   Future<void> _logSet({
     int? reps,
     double? weightKg,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool isWarmup = false,
     int? durationSec,
@@ -360,7 +360,7 @@ class _ExerciseLogger extends StatelessWidget {
   final void Function({
     int? reps,
     double? weightKg,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool isWarmup,
     int? durationSec,
@@ -477,7 +477,7 @@ class _ExerciseLogger extends StatelessWidget {
                       int? durationSec,
                       double? distanceM,
                       int? heartRate,
-                      int? rpe,
+                      double? rpe,
                     }) =>
                         onLogSet(
                       durationSec: durationSec,
@@ -495,7 +495,7 @@ class _ExerciseLogger extends StatelessWidget {
                     onLog: ({
                       int? reps,
                       double? weightKg,
-                      int? rpe,
+                      double? rpe,
                       String? tempo,
                       bool isWarmup = false,
                     }) =>

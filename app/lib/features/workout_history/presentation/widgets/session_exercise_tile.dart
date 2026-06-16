@@ -1,6 +1,9 @@
 import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
 
+import '../../../active_session/presentation/widgets/set_log_tile.dart'
+    show RpeBadge;
+
 /// Displays a single exercise with all its logged sets in the session detail
 /// screen.
 class SessionExerciseTile extends StatelessWidget {
@@ -93,6 +96,10 @@ class _SetRow extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
           ),
+          if (set.rpe != null) ...[
+            const SizedBox(width: 8),
+            RpeBadge(rpe: set.rpe!),
+          ],
         ],
       ),
     );
@@ -130,7 +137,6 @@ class _SetRow extends StatelessWidget {
       }
     }
 
-    if (s.rpe != null) parts.add('RPE ${s.rpe}');
     if (s.tempo != null) parts.add('tempo:${s.tempo}');
 
     return parts.isEmpty ? '—' : parts.join(' · ');
