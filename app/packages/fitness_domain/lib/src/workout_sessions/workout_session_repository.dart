@@ -60,6 +60,16 @@ abstract class WorkoutSessionRepository {
     int limit = 3,
   });
 
+  /// Queries the server for an RPE-to-weight suggestion for [exerciseId] at
+  /// [targetRpe]. Returns null when the user has no prior RPE-logged sets.
+  /// Network errors are thrown to the caller; callers that do not need the
+  /// suggestion to block the main flow should catch [Exception] and treat it
+  /// as null (e.g. session start in [ActiveSessionNotifier]).
+  Future<RpeWeightSuggestion?> getRpeSuggestion({
+    required String exerciseId,
+    required double targetRpe,
+  });
+
   /// Streams summary data for all completed sessions, newest first.
   /// Uses local DB for offline-first reactivity. The caller is responsible
   /// for triggering server sync via [syncCompletedSessions].
@@ -84,6 +94,27 @@ class SessionStartResult {
   final WorkoutSession session;
   // exerciseId → suggested weight in kg (based on PR × targetWeightPct1rm)
   final Map<String, double> suggestedWeights;
+}
+
+class RpeWeightSuggestion {
+  const RpeWeightSuggestion({
+    required this.suggestedWeightKg,
+    required this.baseWeightKg,
+    required this.baseRpe,
+    required this.sessionDate,
+  });
+
+  /// Server-computed weight to target (PR × RPE scaling, rounded to 2.5 kg).
+  final double suggestedWeightKg;
+
+  /// The weight the user lifted in the reference set.
+  final double baseWeightKg;
+
+  /// The RPE logged for the reference set.
+  final double baseRpe;
+
+  /// Date of the session that contained the reference set.
+  final DateTime sessionDate;
 }
 
 class SessionCompletionResult {

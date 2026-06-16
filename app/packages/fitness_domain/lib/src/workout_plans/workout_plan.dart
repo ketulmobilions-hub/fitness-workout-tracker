@@ -48,6 +48,8 @@ abstract class PlanDayExercise with _$PlanDayExercise {
     double? targetDistanceM,
     // Decimal fraction 0.5–1.0 (50%–100% of 1RM). Null when not set.
     double? targetWeightPct1rm,
+    // RPE target 6.0–10.0 (supports 0.5 increments). Null when not set.
+    double? targetRpe,
     String? notes,
   }) = _PlanDayExercise;
 }

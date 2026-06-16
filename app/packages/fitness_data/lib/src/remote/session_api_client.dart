@@ -58,4 +58,14 @@ abstract class SessionApiClient {
     @Path('id') String sessionId,
     @Path('setId') String setId,
   );
+
+  // -------------------------------------------------------------------------
+  // RPE-to-weight suggestion
+  // -------------------------------------------------------------------------
+
+  @GET('/api/v1/sessions/suggest-weight')
+  Future<RpeSuggestionEnvelopeDto> suggestWeight({
+    @Query('exerciseId') required String exerciseId,
+    @Query('targetRpe') required double targetRpe,
+  });
 }

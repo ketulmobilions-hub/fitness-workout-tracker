@@ -98,6 +98,15 @@ const targetWeightPct1rmSchema = z
     message: 'Must be a multiple of 2.5% (0.025)',
   });
 
+// Validates an RPE value: 6.0–10.0 in 0.5 increments. Epsilon guard for float representation.
+const targetRpeSchema = z
+  .number()
+  .min(6)
+  .max(10)
+  .refine((v) => Math.abs(Math.round(v * 2) - v * 2) < 1e-9, {
+    message: 'Must be a 0.5 RPE increment (e.g. 6, 6.5, 7, ... 10)',
+  });
+
 const addExerciseBodySchema = z.object({
   planDayId: z.string().uuid(),
   exerciseId: z.string().uuid(),
@@ -107,6 +116,7 @@ const addExerciseBodySchema = z.object({
   targetDurationSec: z.number().int().min(1).optional(),
   targetDistanceM: z.number().min(0).optional(),
   targetWeightPct1rm: targetWeightPct1rmSchema.optional(),
+  targetRpe: targetRpeSchema.optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -119,6 +129,7 @@ const updateExerciseBodySchema = z
     targetDistanceM: z.number().min(0).optional(),
     // null explicitly clears the field
     targetWeightPct1rm: targetWeightPct1rmSchema.nullable().optional(),
+    targetRpe: targetRpeSchema.nullable().optional(),
     // null explicitly clears the notes field
     notes: z.string().max(500).nullable().optional(),
   })

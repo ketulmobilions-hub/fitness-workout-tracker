@@ -66,6 +66,7 @@ abstract class WorkoutPlanRepository {
     int? targetDurationSec,
     double? targetDistanceM,
     double? targetWeightPct1rm,
+    double? targetRpe,
     String? notes,
   });
 
@@ -73,7 +74,8 @@ abstract class WorkoutPlanRepository {
   /// updated [PlanDayExercise].
   ///
   /// Set [clearTargetWeightPct1rm] to true to explicitly null the field.
-  /// Passing [targetWeightPct1rm] as null without this flag means "no change".
+  /// Set [clearTargetRpe] to true to explicitly null the targetRpe field.
+  /// Passing either field as null without the clear flag means "no change".
   Future<PlanDayExercise> updatePlanExercise({
     required String planId,
     required String planDayExerciseId,
@@ -84,6 +86,8 @@ abstract class WorkoutPlanRepository {
     double? targetDistanceM,
     double? targetWeightPct1rm,
     bool clearTargetWeightPct1rm = false,
+    double? targetRpe,
+    bool clearTargetRpe = false,
     String? notes,
   });
 

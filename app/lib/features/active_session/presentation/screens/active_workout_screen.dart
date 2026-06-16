@@ -439,6 +439,19 @@ class _ExerciseLogger extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (exerciseData.rpeSuggestion != null &&
+                    ex.targetRpe != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _rpeWeightLabel(
+                          exerciseData.rpeSuggestion!, ex.targetRpe!),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.tertiary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 if (ex.notes != null && ex.notes!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -542,6 +555,20 @@ class _ExerciseLogger extends StatelessWidget {
         ? '${pct.toInt()}%'
         : '${pct.toStringAsFixed(1)}%';
     return 'Suggested: $kgStr ($pctStr of 1RM)';
+  }
+
+  /// Returns "Target @8 → ~152.5 kg (based on 150 kg @7 on 6/14/2026)".
+  String _rpeWeightLabel(RpeWeightSuggestion s, double targetRpe) {
+    String kgLabel(double kg) => kg == kg.truncateToDouble()
+        ? '${kg.toInt()} kg'
+        : '${kg.toStringAsFixed(1)} kg';
+    String rpeLabel(double rpe) => rpe == rpe.truncateToDouble()
+        ? '${rpe.toInt()}'
+        : rpe.toStringAsFixed(1);
+    final d = s.sessionDate;
+    final dateStr = '${d.month}/${d.day}/${d.year}';
+    return 'Target @${rpeLabel(targetRpe)} → ~${kgLabel(s.suggestedWeightKg)}'
+        ' (based on ${kgLabel(s.baseWeightKg)} @${rpeLabel(s.baseRpe)} on $dateStr)';
   }
 
   /// Returns a target string for the exercise header, or null if no targets.
