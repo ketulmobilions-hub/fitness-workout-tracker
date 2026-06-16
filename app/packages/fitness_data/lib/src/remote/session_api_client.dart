@@ -25,7 +25,7 @@ abstract class SessionApiClient {
   });
 
   @POST('/api/v1/sessions')
-  Future<SessionDetailEnvelopeDto> startSession(
+  Future<StartSessionEnvelopeDto> startSession(
       @Body() StartSessionRequestDto body);
 
   @GET('/api/v1/sessions/{id}')

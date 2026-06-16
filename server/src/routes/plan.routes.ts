@@ -88,6 +88,16 @@ const targetRepsSchema = z
   .regex(/^\d+(-\d+)?$/, 'targetReps must be a number or range (e.g. "10" or "8-12")')
   .optional();
 
+// Validates a % of 1RM value: decimal fraction 0.5–1.0 in 2.5% (0.025) increments.
+// v * 40 must be an integer (since 1/40 = 0.025). Epsilon guard for float representation.
+const targetWeightPct1rmSchema = z
+  .number()
+  .min(0.5)
+  .max(1.0)
+  .refine((v) => Math.abs(Math.round(v * 40) - v * 40) < 1e-9, {
+    message: 'Must be a multiple of 2.5% (0.025)',
+  });
+
 const addExerciseBodySchema = z.object({
   planDayId: z.string().uuid(),
   exerciseId: z.string().uuid(),
@@ -96,6 +106,7 @@ const addExerciseBodySchema = z.object({
   targetReps: targetRepsSchema,
   targetDurationSec: z.number().int().min(1).optional(),
   targetDistanceM: z.number().min(0).optional(),
+  targetWeightPct1rm: targetWeightPct1rmSchema.optional(),
   notes: z.string().max(500).optional(),
 });
 
@@ -106,6 +117,8 @@ const updateExerciseBodySchema = z
     targetReps: targetRepsSchema,
     targetDurationSec: z.number().int().min(1).optional(),
     targetDistanceM: z.number().min(0).optional(),
+    // null explicitly clears the field
+    targetWeightPct1rm: targetWeightPct1rmSchema.nullable().optional(),
     // null explicitly clears the notes field
     notes: z.string().max(500).nullable().optional(),
   })

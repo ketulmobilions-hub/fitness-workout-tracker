@@ -21,6 +21,7 @@ abstract class PlanDayExerciseDto with _$PlanDayExerciseDto {
     String? targetReps,
     int? targetDurationSec,
     double? targetDistanceM,
+    double? targetWeightPct1rm,
     String? notes,
     required DateTime createdAt,
     required DateTime updatedAt,

@@ -231,7 +231,7 @@ export const startSession = async (_req: Request, res: Response): Promise<void> 
   };
   const { userId } = res.locals.auth!;
 
-  const session = await prisma.$transaction(async (tx) => {
+  const { session, suggestedWeights } = await prisma.$transaction(async (tx) => {
     if (body.planId) {
       const plan = await tx.workoutPlan.findFirst({
         where: { id: body.planId, userId, deletedAt: null },
@@ -250,7 +250,7 @@ export const startSession = async (_req: Request, res: Response): Promise<void> 
       if (!planDay) throw new AppError(404, 'Plan day not found');
     }
 
-    return tx.workoutSession.create({
+    const newSession = await tx.workoutSession.create({
       data: {
         userId,
         planId: body.planId ?? null,
@@ -260,9 +260,52 @@ export const startSession = async (_req: Request, res: Response): Promise<void> 
       },
       include: sessionDetailInclude,
     });
+
+    // Build suggested weights inside the transaction so the plan data and PRs
+    // are read from the same snapshot as the session row (eliminates TOCTOU).
+    const weights: Record<string, number> = {};
+    if (body.planDayId) {
+      // Ownership filter: only read exercises belonging to this user's plan.
+      const planExercises = await tx.planDayExercise.findMany({
+        where: {
+          planDayId: body.planDayId,
+          targetWeightPct1rm: { not: null },
+          planDay: { plan: { userId } },
+        },
+        select: { exerciseId: true, targetWeightPct1rm: true },
+      });
+
+      if (planExercises.length > 0) {
+        const exerciseIds = planExercises.map((e) => e.exerciseId);
+        // Ordered highest first so the first occurrence per exercise is the lifetime best.
+        const prs = await tx.personalRecord.findMany({
+          where: { userId, exerciseId: { in: exerciseIds }, recordType: 'max_weight' },
+          select: { exerciseId: true, value: true },
+          orderBy: { value: 'desc' },
+        });
+
+        const maxWeightByExercise = new Map<string, number>();
+        for (const pr of prs) {
+          if (!maxWeightByExercise.has(pr.exerciseId)) {
+            maxWeightByExercise.set(pr.exerciseId, pr.value);
+          }
+        }
+
+        for (const { exerciseId, targetWeightPct1rm } of planExercises) {
+          const maxWeight = maxWeightByExercise.get(exerciseId);
+          if (maxWeight !== undefined && targetWeightPct1rm !== null) {
+            // Add epsilon before dividing to avoid float representation errors
+            // (e.g. 95 × 0.7 = 66.4999... in IEEE 754) rounding to wrong bracket.
+            weights[exerciseId] = Math.round((maxWeight * targetWeightPct1rm + 1e-9) / 2.5) * 2.5;
+          }
+        }
+      }
+    }
+
+    return { session: newSession, suggestedWeights: weights };
   });
 
-  sendSuccess(res, { session: mapSessionDetail(session) }, 201);
+  sendSuccess(res, { session: mapSessionDetail(session), suggestedWeights }, 201);
 };
 
 export const listSessions = async (_req: Request, res: Response): Promise<void> => {

@@ -59,6 +59,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetReps: ex.targetReps,
               targetDurationSec: ex.targetDurationSec,
               targetDistanceM: ex.targetDistanceM,
+              targetWeightPct1rm: ex.targetWeightPct1rm,
               notes: ex.notes,
             );
           }).toList();
@@ -155,6 +156,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetReps: Value(ex.targetReps),
               targetDurationSec: Value(ex.targetDurationSec),
               targetDistanceM: Value(ex.targetDistanceM),
+              targetWeightPct1rm: Value(ex.targetWeightPct1rm),
               notes: Value(ex.notes),
               createdAt: Value(ex.createdAt),
               updatedAt: Value(ex.updatedAt),
@@ -393,6 +395,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
     String? targetReps,
     int? targetDurationSec,
     double? targetDistanceM,
+    double? targetWeightPct1rm,
     String? notes,
   }) async {
     final localId = _uuid.v4();
@@ -408,6 +411,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetReps: Value(targetReps),
       targetDurationSec: Value(targetDurationSec),
       targetDistanceM: Value(targetDistanceM),
+      targetWeightPct1rm: Value(targetWeightPct1rm),
       notes: Value(notes),
       createdAt: Value(now),
       updatedAt: Value(now),
@@ -423,6 +427,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
         targetReps: targetReps,
         targetDurationSec: targetDurationSec,
         targetDistanceM: targetDistanceM,
+        targetWeightPct1rm: targetWeightPct1rm,
         notes: notes,
       );
       final dto = (await _apiClient.addExercise(planId, body)).data.plan;
@@ -436,7 +441,14 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       // Upsert all exercises for this day so the local cache stays in sync.
       // If server assigned a different UUID for the new exercise, delete the
       // local stub first (no FK children on plan_day_exercises).
-      final added = dayDto.exercises.lastWhere((e) => e.exerciseId == exerciseId);
+      // When the same exercise appears multiple times in a day, match by
+      // sortOrder first (we know the exact position we requested) to avoid
+      // returning the wrong entry.
+      final added = dayDto.exercises.lastWhere(
+        (e) => e.exerciseId == exerciseId && e.sortOrder == sortOrder,
+        orElse: () =>
+            dayDto.exercises.lastWhere((e) => e.exerciseId == exerciseId),
+      );
       if (added.id != localId) {
         await _planDao.deletePlanDayExercise(localId);
       }
@@ -450,6 +462,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           targetReps: Value(ex.targetReps),
           targetDurationSec: Value(ex.targetDurationSec),
           targetDistanceM: Value(ex.targetDistanceM),
+          targetWeightPct1rm: Value(ex.targetWeightPct1rm),
           notes: Value(ex.notes),
           createdAt: Value(ex.createdAt),
           updatedAt: Value(ex.updatedAt),
@@ -472,6 +485,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           if (targetReps != null) 'targetReps': targetReps,
           if (targetDurationSec != null) 'targetDurationSec': targetDurationSec,
           if (targetDistanceM != null) 'targetDistanceM': targetDistanceM,
+          if (targetWeightPct1rm != null) 'targetWeightPct1rm': targetWeightPct1rm,
           if (notes != null) 'notes': notes,
         },
       );
@@ -491,6 +505,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetReps: targetReps,
       targetDurationSec: targetDurationSec,
       targetDistanceM: targetDistanceM,
+      targetWeightPct1rm: targetWeightPct1rm,
       notes: notes,
     );
   }
@@ -504,6 +519,8 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
     String? targetReps,
     int? targetDurationSec,
     double? targetDistanceM,
+    double? targetWeightPct1rm,
+    bool clearTargetWeightPct1rm = false,
     String? notes,
   }) async {
     // ── Write locally first (offline-first) ──────────────────────────────────
@@ -520,6 +537,13 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetDistanceM: targetDistanceM != null
           ? Value(targetDistanceM)
           : const Value.absent(),
+      // Use Value(null) when explicitly clearing; Value.absent() when the
+      // caller didn't mention this field (partial update semantics).
+      targetWeightPct1rm: clearTargetWeightPct1rm
+          ? const Value(null)
+          : targetWeightPct1rm != null
+              ? Value(targetWeightPct1rm)
+              : const Value.absent(),
       notes: notes != null ? Value(notes) : const Value.absent(),
       updatedAt: Value(DateTime.now()),
     ));
@@ -532,6 +556,8 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
         targetReps: targetReps,
         targetDurationSec: targetDurationSec,
         targetDistanceM: targetDistanceM,
+        targetWeightPct1rm:
+            clearTargetWeightPct1rm ? null : targetWeightPct1rm,
         notes: notes,
       );
       final dto =
@@ -553,6 +579,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetReps: Value(ex.targetReps),
               targetDurationSec: Value(ex.targetDurationSec),
               targetDistanceM: Value(ex.targetDistanceM),
+              targetWeightPct1rm: Value(ex.targetWeightPct1rm),
               notes: Value(ex.notes),
               createdAt: Value(ex.createdAt),
               updatedAt: Value(ex.updatedAt),
@@ -581,6 +608,11 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           if (targetReps != null) 'targetReps': targetReps,
           if (targetDurationSec != null) 'targetDurationSec': targetDurationSec,
           if (targetDistanceM != null) 'targetDistanceM': targetDistanceM,
+          // Queue null explicitly when clearing so the sync engine sends the
+          // clear to the server — omitting it would leave the server value stale.
+          if (clearTargetWeightPct1rm || targetWeightPct1rm != null)
+            'targetWeightPct1rm':
+                clearTargetWeightPct1rm ? null : targetWeightPct1rm,
           if (notes != null) 'notes': notes,
         },
       );
@@ -604,6 +636,9 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetReps: targetReps ?? localEx?.targetReps,
       targetDurationSec: targetDurationSec ?? localEx?.targetDurationSec,
       targetDistanceM: targetDistanceM ?? localEx?.targetDistanceM,
+      targetWeightPct1rm: clearTargetWeightPct1rm
+          ? null
+          : (targetWeightPct1rm ?? localEx?.targetWeightPct1rm),
       notes: notes ?? localEx?.notes,
     );
   }
@@ -734,6 +769,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetReps: dto.targetReps,
       targetDurationSec: dto.targetDurationSec,
       targetDistanceM: dto.targetDistanceM,
+      targetWeightPct1rm: dto.targetWeightPct1rm,
       notes: dto.notes,
     );
   }

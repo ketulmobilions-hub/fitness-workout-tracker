@@ -4,7 +4,8 @@ import 'workout_session_summary.dart';
 
 abstract class WorkoutSessionRepository {
   /// Creates a new workout session. Writes to local DB and syncs to the server.
-  Future<WorkoutSession> startSession({
+  /// Returns the session and server-computed suggested weights keyed by exerciseId.
+  Future<SessionStartResult> startSession({
     String? planId,
     String? planDayId,
     DateTime? startedAt,
@@ -72,6 +73,17 @@ abstract class WorkoutSessionRepository {
   /// session. Reads from local DB first; falls back to the server if no
   /// local exercise data exists (e.g. session completed on another device).
   Future<List<ExerciseLog>> getSessionExerciseLogs(String sessionId);
+}
+
+class SessionStartResult {
+  const SessionStartResult({
+    required this.session,
+    this.suggestedWeights = const {},
+  });
+
+  final WorkoutSession session;
+  // exerciseId → suggested weight in kg (based on PR × targetWeightPct1rm)
+  final Map<String, double> suggestedWeights;
 }
 
 class SessionCompletionResult {

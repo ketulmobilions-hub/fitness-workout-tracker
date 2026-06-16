@@ -62,6 +62,7 @@ class PlanDayExercises extends Table {
   TextColumn get targetReps => text().nullable()();
   IntColumn get targetDurationSec => integer().nullable()();
   RealColumn get targetDistanceM => real().nullable()();
+  RealColumn get targetWeightPct1rm => real().nullable()();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
