@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:fitness_domain/fitness_domain.dart';
+import '../../features/active_session/providers/active_session_notifier.dart'
+    show WorkoutSummary;
 
 double _epley(double weightKg, int reps) {
   if (reps <= 1) return weightKg;

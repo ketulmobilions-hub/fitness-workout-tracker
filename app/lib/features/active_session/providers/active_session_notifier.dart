@@ -206,7 +206,7 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
     int? durationSec,
     double? distanceM,
     int? heartRate,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool isWarmup = false,
   }) async {

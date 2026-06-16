@@ -25,7 +25,7 @@ abstract class WorkoutSessionRepository {
     double? distanceM,
     double? paceSecPerKm,
     int? heartRate,
-    int? rpe,
+    double? rpe,
     String? tempo,
     bool isWarmup,
     DateTime? completedAt,

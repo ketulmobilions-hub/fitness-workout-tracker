@@ -18,7 +18,7 @@ abstract class SetLogDto with _$SetLogDto {
     double? distanceM,
     double? paceSecPerKm,
     int? heartRate,
-    int? rpe,
+    double? rpe,
     String? tempo,
     @Default(false) bool isWarmup,
     String? completedAt,

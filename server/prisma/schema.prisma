@@ -274,7 +274,7 @@ model SetLog {
   distanceM     Float?    @map("distance_m")
   paceSecPerKm  Float?    @map("pace_sec_per_km")
   heartRate     Int?      @map("heart_rate")
-  rpe           Int?
+  rpe           Float?
   tempo         String?
   isWarmup      Boolean   @default(false) @map("is_warmup")
   completedAt   DateTime? @map("completed_at")

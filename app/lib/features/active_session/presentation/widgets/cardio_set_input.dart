@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'set_log_tile.dart' show RpeQuickSelect;
+
 /// Form for logging a single cardio interval/effort. Provides a stopwatch
 /// timer (Start / Pause / Stop) that auto-populates the duration field, plus
 /// manual distance, heart rate, and RPE inputs. Pace is calculated live.
@@ -21,7 +23,7 @@ class CardioSetInputRow extends StatefulWidget {
     int? durationSec,
     double? distanceM,
     int? heartRate,
-    int? rpe,
+    double? rpe,
   }) onLog;
 
   /// Pre-fill hint from the previous session (shown as placeholder).
@@ -48,7 +50,7 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
   late final TextEditingController _durationCtrl;
   late final TextEditingController _distanceCtrl;
   final TextEditingController _heartRateCtrl = TextEditingController();
-  final TextEditingController _rpeCtrl = TextEditingController();
+  double? _selectedRpe;
 
   bool _showAdvanced = false;
 
@@ -85,7 +87,6 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
     _durationCtrl.dispose();
     _distanceCtrl.dispose();
     _heartRateCtrl.dispose();
-    _rpeCtrl.dispose();
     super.dispose();
   }
 
@@ -212,14 +213,11 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
     final heartRate =
         (hrRaw != null && hrRaw >= 30 && hrRaw <= 250) ? hrRaw : null;
 
-    final rpeRaw = int.tryParse(_rpeCtrl.text.trim());
-    final rpe = (rpeRaw != null && rpeRaw >= 1 && rpeRaw <= 10) ? rpeRaw : null;
-
     widget.onLog(
       durationSec: durationSec,
       distanceM: distanceM,
       heartRate: heartRate,
-      rpe: rpe,
+      rpe: _selectedRpe,
     );
 
     // Reset timer and fields.
@@ -227,8 +225,10 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
     _durationCtrl.clear();
     _distanceCtrl.clear();
     _heartRateCtrl.clear();
-    _rpeCtrl.clear();
-    setState(() => _showAdvanced = false);
+    setState(() {
+      _selectedRpe = null;
+      _showAdvanced = false;
+    });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -374,44 +374,29 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
                 ),
               ),
 
-            // ── Advanced fields (HR + RPE) ────────────────────────────────
+            // ── RPE quick-select ─────────────────────────────────────────
+            const SizedBox(height: 10),
+            RpeQuickSelect(
+              selected: _selectedRpe,
+              onSelect: (v) => setState(() => _selectedRpe = v),
+            ),
+
+            // ── Advanced field (HR) ───────────────────────────────────────
             if (_showAdvanced) ...[
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _heartRateCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Heart rate',
-                        hintText: 'bpm',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _rpeCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'RPE (1-10)',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
+              TextField(
+                controller: _heartRateCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
                 ],
+                decoration: const InputDecoration(
+                  labelText: 'Heart rate',
+                  hintText: 'bpm',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                textAlign: TextAlign.center,
               ),
             ],
 
@@ -422,7 +407,7 @@ class _CardioSetInputRowState extends State<CardioSetInputRow>
                 _showAdvanced ? Icons.expand_less : Icons.expand_more,
                 size: 16,
               ),
-              label: Text(_showAdvanced ? 'Hide options' : 'Heart rate / RPE'),
+              label: Text(_showAdvanced ? 'Hide options' : 'Heart rate'),
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 visualDensity: VisualDensity.compact,

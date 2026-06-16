@@ -55,7 +55,7 @@ class SetLogs extends Table {
   RealColumn get distanceM => real().nullable()();
   RealColumn get paceSecPerKm => real().nullable()();
   IntColumn get heartRate => integer().nullable()();
-  IntColumn get rpe => integer().nullable()();
+  RealColumn get rpe => real().nullable()();
   TextColumn get tempo => text().nullable()();
   BoolColumn get isWarmup =>
       boolean().withDefault(const Constant(false))();
