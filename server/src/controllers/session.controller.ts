@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
+import { rpeToWeightSuggestion } from '../utils/rpeSuggestion.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -263,6 +264,10 @@ export const startSession = async (_req: Request, res: Response): Promise<void> 
 
     // Build suggested weights inside the transaction so the plan data and PRs
     // are read from the same snapshot as the session row (eliminates TOCTOU).
+    // NOTE: RPE-based suggestions are intentionally NOT included here — they are
+    // lazy-loaded on the client via GET /suggest-weight per exercise. This keeps
+    // the start response fast; RPE lookups require a separate join over set history
+    // that scales with the number of exercises having targetRpe set.
     const weights: Record<string, number> = {};
     if (body.planDayId) {
       // Ownership filter: only read exercises belonging to this user's plan.
@@ -306,6 +311,17 @@ export const startSession = async (_req: Request, res: Response): Promise<void> 
   });
 
   sendSuccess(res, { session: mapSessionDetail(session), suggestedWeights }, 201);
+};
+
+export const suggestWeight = async (_req: Request, res: Response): Promise<void> => {
+  const { exerciseId, targetRpe } = res.locals.validated!.query as {
+    exerciseId: string;
+    targetRpe: number;
+  };
+  const { userId } = res.locals.auth!;
+
+  const result = await rpeToWeightSuggestion(userId, exerciseId, targetRpe);
+  sendSuccess(res, result ?? { suggestedWeight: null, basedOn: null });
 };
 
 export const listSessions = async (_req: Request, res: Response): Promise<void> => {

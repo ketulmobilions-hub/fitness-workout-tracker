@@ -210,6 +210,7 @@ model PlanDayExercise {
   targetDurationSec   Int?    @map("target_duration_sec")
   targetDistanceM     Float?  @map("target_distance_m")
   targetWeightPct1rm  Float?  @map("target_weight_pct_1rm")
+  targetRpe           Float?  @map("target_rpe")
   notes               String?
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")

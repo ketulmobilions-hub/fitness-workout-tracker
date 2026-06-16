@@ -615,6 +615,25 @@ class WorkoutSessionRepositoryImpl implements WorkoutSessionRepository {
         .toList();
   }
 
+  @override
+  Future<RpeWeightSuggestion?> getRpeSuggestion({
+    required String exerciseId,
+    required double targetRpe,
+  }) async {
+    final envelope = await _apiClient.suggestWeight(
+      exerciseId: exerciseId,
+      targetRpe: targetRpe,
+    );
+    final data = envelope.data;
+    if (data.suggestedWeight == null || data.basedOn == null) return null;
+    return RpeWeightSuggestion(
+      suggestedWeightKg: data.suggestedWeight!,
+      baseWeightKg: data.basedOn!.weightKg,
+      baseRpe: data.basedOn!.rpe,
+      sessionDate: DateTime.parse(data.basedOn!.sessionDate),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------

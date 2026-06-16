@@ -74,7 +74,11 @@ const setFieldsSchema = z.object({
   distanceM: z.number().min(0).optional(),
   paceSecPerKm: z.number().min(0).optional(),
   heartRate: z.number().int().min(1).max(300).optional(),
-  rpe: z.number().min(6).max(10).optional(),
+  rpe: z.number().min(6).max(10)
+    .refine((v) => Math.abs(Math.round(v * 2) - v * 2) < 1e-9, {
+      message: 'RPE must be in 0.5 increments (e.g. 6, 6.5, 7, ... 10)',
+    })
+    .optional(),
   tempo: z.string().max(20).optional(),
   isWarmup: z.boolean().optional(),
   completedAt: z.string().datetime({ offset: true }).optional(),
@@ -105,7 +109,12 @@ const updateSetBodySchema = z
     distanceM: z.number().min(0).nullable().optional(),
     paceSecPerKm: z.number().min(0).nullable().optional(),
     heartRate: z.number().int().min(1).max(300).nullable().optional(),
-    rpe: z.number().min(6).max(10).nullable().optional(),
+    rpe: z.number().min(6).max(10)
+      .refine((v) => Math.abs(Math.round(v * 2) - v * 2) < 1e-9, {
+        message: 'RPE must be in 0.5 increments (e.g. 6, 6.5, 7, ... 10)',
+      })
+      .nullable()
+      .optional(),
     tempo: z.string().max(20).nullable().optional(),
     isWarmup: z.boolean().optional(),
     completedAt: z.string().datetime({ offset: true }).nullable().optional(),
@@ -130,8 +139,25 @@ const completeSessionBodySchema = z
     }
   });
 
+const suggestWeightQuerySchema = z.object({
+  exerciseId: z.string().uuid(),
+  // Comes in as a query string — parse to float before validating range.
+  targetRpe: z
+    .string()
+    .transform((val) => parseFloat(val))
+    .pipe(
+      z.number().min(6).max(10).refine(
+        (v) => Math.abs(Math.round(v * 2) - v * 2) < 1e-9,
+        { message: 'Must be a 0.5 RPE increment (e.g. 6, 6.5, 7, ... 10)' },
+      ),
+    ),
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
+// Registered before /:id routes. The UUID validation on /:id rejects "suggest-weight" anyway,
+// but route-first ordering is the conventional guard against literal-string/param collisions.
+router.get('/suggest-weight', validate({ query: suggestWeightQuerySchema }), session.suggestWeight);
 router.post('/', validate({ body: startSessionBodySchema }), session.startSession);
 router.get('/', validate({ query: listSessionsQuerySchema }), session.listSessions);
 router.get('/:id', validate({ params: sessionParamsSchema }), session.getSession);

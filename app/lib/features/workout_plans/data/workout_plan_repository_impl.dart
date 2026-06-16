@@ -60,6 +60,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetDurationSec: ex.targetDurationSec,
               targetDistanceM: ex.targetDistanceM,
               targetWeightPct1rm: ex.targetWeightPct1rm,
+              targetRpe: ex.targetRpe,
               notes: ex.notes,
             );
           }).toList();
@@ -157,6 +158,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetDurationSec: Value(ex.targetDurationSec),
               targetDistanceM: Value(ex.targetDistanceM),
               targetWeightPct1rm: Value(ex.targetWeightPct1rm),
+              targetRpe: Value(ex.targetRpe),
               notes: Value(ex.notes),
               createdAt: Value(ex.createdAt),
               updatedAt: Value(ex.updatedAt),
@@ -396,6 +398,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
     int? targetDurationSec,
     double? targetDistanceM,
     double? targetWeightPct1rm,
+    double? targetRpe,
     String? notes,
   }) async {
     final localId = _uuid.v4();
@@ -412,6 +415,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetDurationSec: Value(targetDurationSec),
       targetDistanceM: Value(targetDistanceM),
       targetWeightPct1rm: Value(targetWeightPct1rm),
+      targetRpe: Value(targetRpe),
       notes: Value(notes),
       createdAt: Value(now),
       updatedAt: Value(now),
@@ -428,6 +432,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
         targetDurationSec: targetDurationSec,
         targetDistanceM: targetDistanceM,
         targetWeightPct1rm: targetWeightPct1rm,
+        targetRpe: targetRpe,
         notes: notes,
       );
       final dto = (await _apiClient.addExercise(planId, body)).data.plan;
@@ -463,6 +468,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           targetDurationSec: Value(ex.targetDurationSec),
           targetDistanceM: Value(ex.targetDistanceM),
           targetWeightPct1rm: Value(ex.targetWeightPct1rm),
+          targetRpe: Value(ex.targetRpe),
           notes: Value(ex.notes),
           createdAt: Value(ex.createdAt),
           updatedAt: Value(ex.updatedAt),
@@ -486,6 +492,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           if (targetDurationSec != null) 'targetDurationSec': targetDurationSec,
           if (targetDistanceM != null) 'targetDistanceM': targetDistanceM,
           if (targetWeightPct1rm != null) 'targetWeightPct1rm': targetWeightPct1rm,
+          if (targetRpe != null) 'targetRpe': targetRpe,
           if (notes != null) 'notes': notes,
         },
       );
@@ -506,6 +513,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetDurationSec: targetDurationSec,
       targetDistanceM: targetDistanceM,
       targetWeightPct1rm: targetWeightPct1rm,
+      targetRpe: targetRpe,
       notes: notes,
     );
   }
@@ -521,6 +529,8 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
     double? targetDistanceM,
     double? targetWeightPct1rm,
     bool clearTargetWeightPct1rm = false,
+    double? targetRpe,
+    bool clearTargetRpe = false,
     String? notes,
   }) async {
     // ── Write locally first (offline-first) ──────────────────────────────────
@@ -544,6 +554,11 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           : targetWeightPct1rm != null
               ? Value(targetWeightPct1rm)
               : const Value.absent(),
+      targetRpe: clearTargetRpe
+          ? const Value(null)
+          : targetRpe != null
+              ? Value(targetRpe)
+              : const Value.absent(),
       notes: notes != null ? Value(notes) : const Value.absent(),
       updatedAt: Value(DateTime.now()),
     ));
@@ -558,6 +573,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
         targetDistanceM: targetDistanceM,
         targetWeightPct1rm:
             clearTargetWeightPct1rm ? null : targetWeightPct1rm,
+        targetRpe: clearTargetRpe ? null : targetRpe,
         notes: notes,
       );
       final dto =
@@ -580,6 +596,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               targetDurationSec: Value(ex.targetDurationSec),
               targetDistanceM: Value(ex.targetDistanceM),
               targetWeightPct1rm: Value(ex.targetWeightPct1rm),
+              targetRpe: Value(ex.targetRpe),
               notes: Value(ex.notes),
               createdAt: Value(ex.createdAt),
               updatedAt: Value(ex.updatedAt),
@@ -613,6 +630,8 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           if (clearTargetWeightPct1rm || targetWeightPct1rm != null)
             'targetWeightPct1rm':
                 clearTargetWeightPct1rm ? null : targetWeightPct1rm,
+          if (clearTargetRpe || targetRpe != null)
+            'targetRpe': clearTargetRpe ? null : targetRpe,
           if (notes != null) 'notes': notes,
         },
       );
@@ -639,6 +658,8 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetWeightPct1rm: clearTargetWeightPct1rm
           ? null
           : (targetWeightPct1rm ?? localEx?.targetWeightPct1rm),
+      targetRpe:
+          clearTargetRpe ? null : (targetRpe ?? localEx?.targetRpe),
       notes: notes ?? localEx?.notes,
     );
   }
@@ -770,6 +791,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
       targetDurationSec: dto.targetDurationSec,
       targetDistanceM: dto.targetDistanceM,
       targetWeightPct1rm: dto.targetWeightPct1rm,
+      targetRpe: dto.targetRpe,
       notes: dto.notes,
     );
   }

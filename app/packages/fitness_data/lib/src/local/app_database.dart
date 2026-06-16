@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -121,6 +121,11 @@ class AppDatabase extends _$AppDatabase {
           // auto-suggest. Stored as decimal 0.5–1.0; null = not set.
           await m.addColumn(
               planDayExercises, planDayExercises.targetWeightPct1rm);
+        }
+        if (from < 5) {
+          // Add target_rpe to plan_day_exercises for RPE-to-weight suggestion.
+          // Stored as float 6.0–10.0; null = not set.
+          await m.addColumn(planDayExercises, planDayExercises.targetRpe);
         }
       },
     );

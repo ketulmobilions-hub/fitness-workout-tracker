@@ -19,6 +19,7 @@ class ActiveExerciseData {
     this.loggedSets = const [],
     this.previousSessions = const [],
     this.suggestedWeightKg,
+    this.rpeSuggestion,
   });
 
   /// The exercise as planned (with targets). For ad-hoc exercises added
@@ -38,17 +39,27 @@ class ActiveExerciseData {
   /// Null when no 1RM target is set or the user has no max_weight PR.
   final double? suggestedWeightKg;
 
+  /// Server-computed RPE-to-weight suggestion.
+  /// Null when no targetRpe is set on the plan exercise or no prior RPE
+  /// history exists for this exercise.
+  final RpeWeightSuggestion? rpeSuggestion;
+
   ActiveExerciseData copyWith({
     String? exerciseLogId,
     List<SetLog>? loggedSets,
     List<PreviousSessionData>? previousSessions,
+    // Use ValueGetter wrappers to allow explicit null updates on nullable fields.
+    // Pass `() => null` to clear, omit to preserve the current value.
+    ValueGetter<double?>? suggestedWeightKg,
+    ValueGetter<RpeWeightSuggestion?>? rpeSuggestion,
   }) =>
       ActiveExerciseData(
         planExercise: planExercise,
         exerciseLogId: exerciseLogId ?? this.exerciseLogId,
         loggedSets: loggedSets ?? this.loggedSets,
         previousSessions: previousSessions ?? this.previousSessions,
-        suggestedWeightKg: suggestedWeightKg,
+        suggestedWeightKg: suggestedWeightKg != null ? suggestedWeightKg() : this.suggestedWeightKg,
+        rpeSuggestion: rpeSuggestion != null ? rpeSuggestion() : this.rpeSuggestion,
       );
 }
 
@@ -176,15 +187,35 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
 
       _sessionStartTime = result.session.startedAt;
 
-      // Load previous sessions for each exercise in parallel.
-      final previousSessions = await Future.wait(
-        exercises.map((ex) => repo
-            .getPreviousSessions(
+      // Load previous sessions sequentially to avoid unbounded parallel DB queries.
+      // on Exception: catches network/server errors but lets programming Errors propagate.
+      final previousSessions = <List<PreviousSessionData>>[];
+      for (final ex in exercises) {
+        try {
+          previousSessions.add(await repo.getPreviousSessions(
+            exerciseId: ex.exerciseId,
+            excludeSessionId: result.session.id,
+          ));
+        } on Exception {
+          previousSessions.add(<PreviousSessionData>[]);
+        }
+      }
+
+      final rpeSuggestions = <RpeWeightSuggestion?>[];
+      for (final ex in exercises) {
+        if (ex.targetRpe != null) {
+          try {
+            rpeSuggestions.add(await repo.getRpeSuggestion(
               exerciseId: ex.exerciseId,
-              excludeSessionId: result.session.id,
-            )
-            .catchError((_) => <PreviousSessionData>[])),
-      );
+              targetRpe: ex.targetRpe!,
+            ));
+          } on Exception {
+            rpeSuggestions.add(null);
+          }
+        } else {
+          rpeSuggestions.add(null);
+        }
+      }
 
       state = ActiveSessionState(
         session: result.session,
@@ -195,6 +226,7 @@ class ActiveSessionNotifier extends _$ActiveSessionNotifier {
             previousSessions: previousSessions[i],
             suggestedWeightKg:
                 result.suggestedWeights[exercises[i].exerciseId],
+            rpeSuggestion: rpeSuggestions[i],
           ),
         ),
       );

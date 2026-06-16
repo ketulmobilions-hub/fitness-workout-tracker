@@ -82,7 +82,8 @@ abstract class SessionDetailDto with _$SessionDetailDto {
 abstract class StartSessionDataDto with _$StartSessionDataDto {
   const factory StartSessionDataDto({
     required SessionDetailDto session,
-    // exerciseId → suggested weight in kg based on PR × targetWeightPct1rm
+    // exerciseId → suggested weight in kg (PR × targetWeightPct1rm exercises only).
+    // RPE-based suggestions are lazy-loaded via GET /sessions/suggest-weight per exercise.
     @Default(<String, double>{}) Map<String, double> suggestedWeights,
   }) = _StartSessionDataDto;
 
@@ -193,4 +194,42 @@ abstract class CompleteSessionEnvelopeDto with _$CompleteSessionEnvelopeDto {
 
   factory CompleteSessionEnvelopeDto.fromJson(Map<String, dynamic> json) =>
       _$CompleteSessionEnvelopeDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
+// RPE-to-weight suggestion response
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class RpeSuggestionBasedOnDto with _$RpeSuggestionBasedOnDto {
+  const factory RpeSuggestionBasedOnDto({
+    required double weightKg,
+    required double rpe,
+    required String sessionDate,
+  }) = _RpeSuggestionBasedOnDto;
+
+  factory RpeSuggestionBasedOnDto.fromJson(Map<String, dynamic> json) =>
+      _$RpeSuggestionBasedOnDtoFromJson(json);
+}
+
+@freezed
+abstract class RpeSuggestionDataDto with _$RpeSuggestionDataDto {
+  const factory RpeSuggestionDataDto({
+    double? suggestedWeight,
+    RpeSuggestionBasedOnDto? basedOn,
+  }) = _RpeSuggestionDataDto;
+
+  factory RpeSuggestionDataDto.fromJson(Map<String, dynamic> json) =>
+      _$RpeSuggestionDataDtoFromJson(json);
+}
+
+@freezed
+abstract class RpeSuggestionEnvelopeDto with _$RpeSuggestionEnvelopeDto {
+  const factory RpeSuggestionEnvelopeDto({
+    required int status,
+    required RpeSuggestionDataDto data,
+  }) = _RpeSuggestionEnvelopeDto;
+
+  factory RpeSuggestionEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$RpeSuggestionEnvelopeDtoFromJson(json);
 }
