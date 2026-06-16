@@ -174,6 +174,7 @@ class SetInputRow extends StatefulWidget {
     required this.onLog,
     this.previousWeight,
     this.previousReps,
+    this.previousTempo,
     this.targetReps,
     this.targetSets,
   });
@@ -188,6 +189,8 @@ class SetInputRow extends StatefulWidget {
   }) onLog;
   final double? previousWeight;
   final int? previousReps;
+  /// Tempo from the most recent set in the current session — auto-filled.
+  final String? previousTempo;
   final String? targetReps;
   final int? targetSets;
 
@@ -198,10 +201,15 @@ class SetInputRow extends StatefulWidget {
 class _SetInputRowState extends State<SetInputRow> {
   late final TextEditingController _weightCtrl;
   late final TextEditingController _repsCtrl;
-  final TextEditingController _tempoCtrl = TextEditingController();
   double? _selectedRpe;
   bool _isWarmup = false;
   bool _showAdvanced = false;
+  /// Incremented after submit to force _TempoInput to recreate with fresh state.
+  int _tempoResetKey = 0;
+  /// Driven exclusively by _TempoInput.onChanged — null when section is hidden.
+  /// Never seeded from widget.previousTempo directly; _TempoInput handles that
+  /// via its initialValue so the value is only active when visible to the user.
+  String? _currentTempo;
 
   @override
   void initState() {
@@ -216,33 +224,36 @@ class _SetInputRowState extends State<SetInputRow> {
     _repsCtrl = TextEditingController(
       text: widget.previousReps?.toString() ?? '',
     );
+    // _currentTempo intentionally NOT seeded from widget.previousTempo here.
+    // _TempoInput calls onChanged immediately on mount (initState → _notify),
+    // so _currentTempo is set only when the advanced section is open and the
+    // user has seen the field — preventing silent phantom tempo on hidden sets.
   }
 
   @override
   void dispose() {
     _weightCtrl.dispose();
     _repsCtrl.dispose();
-    _tempoCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     final weightKg = double.tryParse(_weightCtrl.text.trim());
     final reps = int.tryParse(_repsCtrl.text.trim());
-    final tempo = _tempoCtrl.text.trim();
     widget.onLog(
       reps: reps,
       weightKg: weightKg,
       rpe: _selectedRpe,
-      tempo: tempo.isEmpty ? null : tempo,
+      tempo: _currentTempo,
       isWarmup: _isWarmup,
     );
     setState(() {
       _selectedRpe = null;
       _showAdvanced = false;
       _isWarmup = false;
+      _currentTempo = null; // cleared; _TempoInput re-seeds via onChanged on next open
+      _tempoResetKey++;
     });
-    _tempoCtrl.clear();
   }
 
   @override
@@ -313,20 +324,14 @@ class _SetInputRowState extends State<SetInputRow> {
             // ── Advanced: tempo + warm-up ────────────────────────────────────
             if (_showAdvanced) ...[
               const SizedBox(height: 8),
+              _TempoInput(
+                key: ValueKey(_tempoResetKey),
+                initialValue: widget.previousTempo,
+                onChanged: (v) => _currentTempo = v,
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _tempoCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Tempo',
-                        hintText: 'e.g. 3-1-2',
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Checkbox(
                     value: _isWarmup,
                     onChanged: (v) => setState(() => _isWarmup = v ?? false),
@@ -413,6 +418,203 @@ class RpeQuickSelect extends StatelessWidget {
               );
             }).toList(),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Tempo presets ─────────────────────────────────────────────────────────────
+
+const _tempoPresets = [
+  ('Touch & Go', '1-0-X-0'),
+  ('Controlled', '3-1-2-0'),
+  ('Pause', '3-2-X-0'),
+  ('Slow Ecc.', '4-1-X-0'),
+];
+
+/// 4-segment tempo input (eccentric–bottom pause–concentric–top pause).
+/// Each segment accepts a single digit (0–9) or the letter X.
+/// Auto-advances focus to the next segment after a valid character is entered.
+/// Preset buttons fill all four segments at once.
+class _TempoInput extends StatefulWidget {
+  const _TempoInput({super.key, this.initialValue, required this.onChanged});
+
+  final String? initialValue;
+  final void Function(String?) onChanged;
+
+  @override
+  State<_TempoInput> createState() => _TempoInputState();
+}
+
+class _TempoInputState extends State<_TempoInput> {
+  final _ctrls = List.generate(4, (_) => TextEditingController());
+  final _nodes = List.generate(4, (_) => FocusNode());
+
+  static const _labels = ['Ecc', 'Bot', 'Con', 'Top'];
+
+  @override
+  void initState() {
+    super.initState();
+    // Attach backspace-backward listeners before filling values.
+    for (var i = 1; i < 4; i++) {
+      final idx = i;
+      _nodes[idx].onKeyEvent = (_, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.backspace &&
+            _ctrls[idx].text.isEmpty) {
+          _nodes[idx - 1].requestFocus();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      };
+    }
+    _applyValue(widget.initialValue);
+    // Notify parent with the pre-filled value so _currentTempo is in sync
+    // from the moment _TempoInput is mounted, not only after the user types.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notify();
+    });
+  }
+
+  @override
+  void didUpdateWidget(_TempoInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Handles the case where parent rebuilds (e.g. set deleted) with a new
+    // initialValue without triggering a key-forced full recreation.
+    if (oldWidget.initialValue != widget.initialValue) {
+      _applyValue(widget.initialValue);
+      _notify();
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _ctrls) c.dispose();
+    for (final n in _nodes) n.dispose();
+    super.dispose();
+  }
+
+  /// Fills controllers from [tempo]. Validates each segment: takes only the
+  /// first valid char (0–9 or X, uppercased) to guard against malformed DB
+  /// values bypassing the max-1-char formatter.
+  void _applyValue(String? tempo) {
+    if (tempo == null) {
+      for (final c in _ctrls) c.text = '';
+      return;
+    }
+    final segs = tempo.split('-');
+    if (segs.length != 4) {
+      for (final c in _ctrls) c.text = '';
+      return;
+    }
+    for (var i = 0; i < 4; i++) {
+      final cleaned = segs[i]
+          .toUpperCase()
+          .replaceAll(RegExp(r'[^0-9X]'), '');
+      _ctrls[i].text = cleaned.isNotEmpty ? cleaned[0] : '';
+    }
+  }
+
+  void _onSegmentChanged(int index, String val) {
+    final cleaned = val.toUpperCase().replaceAll(RegExp(r'[^0-9X]'), '');
+    if (cleaned != val) {
+      _ctrls[index].value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+    }
+    if (cleaned.isNotEmpty && index < 3) {
+      _nodes[index + 1].requestFocus();
+    }
+    _notify();
+  }
+
+  void _notify() {
+    final segs = _ctrls.map((c) => c.text.toUpperCase()).toList();
+    final complete = segs.every((s) => s.isNotEmpty);
+    widget.onChanged(complete ? segs.join('-') : null);
+  }
+
+  void _applyPreset(String tempo) {
+    _applyValue(tempo);
+    _notify();
+    // Dismiss keyboard and clear focus from all segment boxes.
+    FocusScope.of(context).unfocus();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tempo (ecc – bot – con – top)',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 6),
+        // ── 4 segment boxes ──────────────────────────────────────────────────
+        Row(
+          children: List.generate(4, (i) {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i < 3 ? 4 : 0),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _ctrls[i],
+                      focusNode: _nodes[i],
+                      textCapitalization: TextCapitalization.characters,
+                      keyboardType: TextInputType.text,
+                      maxLength: 1,
+                      textAlign: TextAlign.center,
+                      onChanged: (v) => _onSegmentChanged(i, v),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        hintText: i == 1 || i == 3 ? '0' : 'X',
+                        hintStyle: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withAlpha(100),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _labels[i],
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        // ── Preset chips ─────────────────────────────────────────────────────
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: _tempoPresets.map((p) {
+            final (label, value) = p;
+            return ActionChip(
+              label: Text(label),
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              labelStyle: theme.textTheme.labelSmall,
+              onPressed: () => _applyPreset(value),
+            );
+          }).toList(),
         ),
       ],
     );
