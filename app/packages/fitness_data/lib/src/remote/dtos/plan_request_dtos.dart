@@ -13,6 +13,7 @@ abstract class CreatePlanDayDto with _$CreatePlanDayDto {
     required int dayOfWeek,
     @JsonKey(includeIfNull: false) int? weekNumber,
     @JsonKey(includeIfNull: false) String? name,
+    @Default(false) bool isDeload,
     required int sortOrder,
   }) = _CreatePlanDayDto;
 
@@ -117,6 +118,23 @@ abstract class ReorderPlanExercisesRequestDto
   factory ReorderPlanExercisesRequestDto.fromJson(
           Map<String, dynamic> json) =>
       _$ReorderPlanExercisesRequestDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
+// Update a plan day (isDeload toggle, name rename)
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class UpdatePlanDayRequestDto with _$UpdatePlanDayRequestDto {
+  const factory UpdatePlanDayRequestDto({
+    // Omitted from JSON when null — "no change" semantics.
+    @JsonKey(includeIfNull: false) bool? isDeload,
+    // Omitted from JSON when null — "no change" semantics.
+    @JsonKey(includeIfNull: false) String? name,
+  }) = _UpdatePlanDayRequestDto;
+
+  factory UpdatePlanDayRequestDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdatePlanDayRequestDtoFromJson(json);
 }
 
 // ---------------------------------------------------------------------------

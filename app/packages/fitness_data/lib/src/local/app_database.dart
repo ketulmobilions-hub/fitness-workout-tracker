@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -126,6 +126,11 @@ class AppDatabase extends _$AppDatabase {
           // Add target_rpe to plan_day_exercises for RPE-to-weight suggestion.
           // Stored as float 6.0–10.0; null = not set.
           await m.addColumn(planDayExercises, planDayExercises.targetRpe);
+        }
+        if (from < 6) {
+          // Add is_deload to plan_days to tag deload weeks from template imports.
+          // Defaults to false for all pre-existing rows.
+          await m.addColumn(planDays, planDays.isDeload);
         }
       },
     );

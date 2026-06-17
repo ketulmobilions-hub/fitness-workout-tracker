@@ -41,6 +41,8 @@ class PlanDays extends Table {
   // that warrants the complexity.
   IntColumn get weekNumber => integer()();
   TextColumn get name => text().nullable()();
+  BoolColumn get isDeload =>
+      boolean().withDefault(const Constant(false))();
   IntColumn get sortOrder => integer()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();

@@ -24,12 +24,14 @@ class TemplateDay {
     required this.name,
     required this.sortOrder,
     required this.exercises,
+    this.isDeload = false,
   });
 
   final int dayOfWeek;
   final String name;
   final int sortOrder;
   final List<TemplateExercise> exercises;
+  final bool isDeload;
 
   static const _dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   String get dayName => _dayNames[dayOfWeek];

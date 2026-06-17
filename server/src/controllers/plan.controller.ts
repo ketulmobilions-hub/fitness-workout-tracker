@@ -46,6 +46,7 @@ type MappedPlanDay = {
   dayOfWeek: number;
   weekNumber: number | null;
   name: string | null;
+  isDeload: boolean;
   sortOrder: number;
   exercises: MappedPlanDayExercise[];
 };
@@ -106,6 +107,7 @@ function mapPlanDay(day: PlanDayWithExercises): MappedPlanDay {
     dayOfWeek: day.dayOfWeek,
     weekNumber: day.weekNumber,
     name: day.name,
+    isDeload: day.isDeload,
     sortOrder: day.sortOrder,
     exercises: day.exercises.map(mapPlanDayExercise),
   };
@@ -229,6 +231,7 @@ export const createPlan = async (_req: Request, res: Response): Promise<void> =>
       dayOfWeek: number;
       weekNumber?: number;
       name?: string;
+      isDeload?: boolean;
       sortOrder: number;
     }>;
   };
@@ -249,6 +252,7 @@ export const createPlan = async (_req: Request, res: Response): Promise<void> =>
                   dayOfWeek: d.dayOfWeek,
                   weekNumber: d.weekNumber ?? null,
                   name: d.name ?? null,
+                  isDeload: d.isDeload ?? false,
                   sortOrder: d.sortOrder,
                 })),
               },
@@ -289,6 +293,39 @@ export const updatePlan = async (_req: Request, res: Response): Promise<void> =>
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'Workout plan not found');
+    }
+    throw err;
+  }
+};
+
+export const updatePlanDay = async (_req: Request, res: Response): Promise<void> => {
+  const { id: planId, dayId } = res.locals.validated!.params as { id: string; dayId: string };
+  const body = res.locals.validated!.body as { isDeload?: boolean; name?: string | null };
+  const { userId } = res.locals.auth!;
+
+  // Atomic single-query ownership check: planId + plan.userId + plan.deletedAt
+  // ensures a race between two concurrent requests cannot TOCTOU the ownership gate.
+  try {
+    const day = await prisma.planDay.update({
+      where: { id: dayId, planId, plan: { userId, deletedAt: null } },
+      data: {
+        ...(body.isDeload !== undefined && { isDeload: body.isDeload }),
+        ...(body.name !== undefined && { name: body.name }),
+      },
+    });
+    sendSuccess(res, {
+      day: {
+        id: day.id,
+        dayOfWeek: day.dayOfWeek,
+        weekNumber: day.weekNumber,
+        name: day.name,
+        isDeload: day.isDeload,
+        sortOrder: day.sortOrder,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'Plan day not found');
     }
     throw err;
   }
@@ -670,6 +707,7 @@ export const importTemplate = async (_req: Request, res: Response): Promise<void
               dayOfWeek: day.dayOfWeek,
               weekNumber: week.weekNumber,
               name: day.name,
+              isDeload: day.isDeload,
               sortOrder: day.sortOrder,
               exercises: {
                 create: day.exercises.map((ex) => {

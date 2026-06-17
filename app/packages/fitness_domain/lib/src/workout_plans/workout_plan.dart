@@ -29,6 +29,7 @@ abstract class PlanDay with _$PlanDay {
     /// For recurring multi-week plans this is 1-based (1 = first week).
     int? weekNumber,
     String? name,
+    @Default(false) bool isDeload,
     required int sortOrder,
     @Default([]) List<PlanDayExercise> exercises,
   }) = _PlanDay;

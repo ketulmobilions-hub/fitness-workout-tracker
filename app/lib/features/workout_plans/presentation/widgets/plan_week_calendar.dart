@@ -51,6 +51,7 @@ class _PlanWeekCalendarState extends State<PlanWeekCalendar> {
   // Non-final: rebuilt in didUpdateWidget when plan data changes.
   Map<int, List<PlanDay>> _daysByWeek = {};
   List<int> _weekNumbers = [];
+  Set<int> _deloadWeeks = {};
 
   // Expansion state keyed by day ID — survives week switches and stream ticks.
   final Set<String> _expandedDayIds = {};
@@ -64,7 +65,8 @@ class _PlanWeekCalendarState extends State<PlanWeekCalendar> {
   @override
   void didUpdateWidget(PlanWeekCalendar old) {
     super.didUpdateWidget(old);
-    if (old.plan != widget.plan) _buildWeekMap();
+    // setState ensures the widget rebuilds with the new _daysByWeek/_weekNumbers.
+    if (old.plan != widget.plan) setState(_buildWeekMap);
   }
 
   void _buildWeekMap() {
@@ -83,6 +85,20 @@ class _PlanWeekCalendarState extends State<PlanWeekCalendar> {
     }
     _daysByWeek = map;
     _weekNumbers = map.keys.toList()..sort();
+    // A week is a deload week if any day in it has isDeload = true.
+    _deloadWeeks = {
+      for (final entry in map.entries)
+        if (entry.value.any((d) => d.isDeload)) entry.key,
+    };
+    // If the parent's selected week is no longer in the updated week list
+    // (e.g. plan was reloaded after a server edit), nudge the parent to select
+    // the first valid week. Must happen post-frame — can't call setState from
+    // within setState (didUpdateWidget) or from initState.
+    if (_weekNumbers.isNotEmpty && !_weekNumbers.contains(widget.selectedWeek)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onWeekSelected(_weekNumbers.first);
+      });
+    }
   }
 
   void _toggleDay(String dayId) {
@@ -111,9 +127,11 @@ class _PlanWeekCalendarState extends State<PlanWeekCalendar> {
         _WeekSelectorBar(
           weekNumbers: _weekNumbers,
           selectedWeek: widget.selectedWeek,
+          deloadWeeks: _deloadWeeks,
           onSelected: widget.onWeekSelected,
           scrollController: _weekScrollCtrl,
         ),
+        if (_deloadWeeks.contains(widget.selectedWeek)) const _DeloadBanner(),
         const Divider(height: 1),
         Expanded(
           child: days.isEmpty
@@ -155,12 +173,14 @@ class _WeekSelectorBar extends StatelessWidget {
   const _WeekSelectorBar({
     required this.weekNumbers,
     required this.selectedWeek,
+    required this.deloadWeeks,
     required this.onSelected,
     required this.scrollController,
   });
 
   final List<int> weekNumbers;
   final int selectedWeek;
+  final Set<int> deloadWeeks;
   final ValueChanged<int> onSelected;
   final ScrollController scrollController;
 
@@ -195,14 +215,57 @@ class _WeekSelectorBar extends StatelessWidget {
               itemBuilder: (context, index) {
                 final wk = weekNumbers[index];
                 final isSelected = wk == selectedWeek;
+                final isDeloadWk = deloadWeeks.contains(wk);
                 return ChoiceChip(
-                  label: Text('Wk $wk'),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Wk $wk'),
+                      if (isDeloadWk) ...[
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_downward, size: 12),
+                      ],
+                    ],
+                  ),
                   selected: isSelected,
                   onSelected: (_) => onSelected(wk),
                   showCheckmark: false,
+                  tooltip: isDeloadWk ? 'Deload week' : null,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Deload week banner
+// ---------------------------------------------------------------------------
+
+class _DeloadBanner extends StatelessWidget {
+  const _DeloadBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      color: cs.tertiaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.arrow_downward, size: 16, color: cs.onTertiaryContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Deload week — reduce weights to 60–70% of normal. Focus on recovery.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onTertiaryContainer,
+              ),
             ),
           ),
         ],
@@ -252,7 +315,29 @@ class _WeekDayCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_dayName(day), style: theme.textTheme.titleSmall),
+                        Row(
+                          children: [
+                            Text(_dayName(day), style: theme.textTheme.titleSmall),
+                            if (day.isDeload) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.tertiaryContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'DELOAD',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onTertiaryContainer,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           exLabel,
