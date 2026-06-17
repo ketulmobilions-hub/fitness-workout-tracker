@@ -10,6 +10,7 @@ export 'presentation/widgets/exercise_type_icon.dart';
 export 'presentation/widgets/plan_card.dart';
 export 'presentation/widgets/plan_day_section.dart';
 export 'presentation/widgets/plan_exercise_item.dart';
+export 'presentation/widgets/plan_week_calendar.dart';
 export 'providers/exercise_picker_filter_provider.dart';
 export 'providers/plan_detail_provider.dart';
 export 'providers/plan_form_provider.dart';
