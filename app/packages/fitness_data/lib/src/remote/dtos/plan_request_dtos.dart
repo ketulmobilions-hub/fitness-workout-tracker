@@ -118,3 +118,21 @@ abstract class ReorderPlanExercisesRequestDto
           Map<String, dynamic> json) =>
       _$ReorderPlanExercisesRequestDtoFromJson(json);
 }
+
+// ---------------------------------------------------------------------------
+// Import a powerlifting program template as a new user plan
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class ImportTemplateRequestDto with _$ImportTemplateRequestDto {
+  const factory ImportTemplateRequestDto({
+    String? name,
+    @JsonKey(includeIfNull: false) double? squatMax,
+    @JsonKey(includeIfNull: false) double? benchMax,
+    @JsonKey(includeIfNull: false) double? deadliftMax,
+    @JsonKey(includeIfNull: false) double? ohpMax,
+  }) = _ImportTemplateRequestDto;
+
+  factory ImportTemplateRequestDto.fromJson(Map<String, dynamic> json) =>
+      _$ImportTemplateRequestDtoFromJson(json);
+}

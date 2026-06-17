@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
+import { PROGRAM_TEMPLATES } from '../data/powerlifting-templates.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -552,4 +553,150 @@ export const removeExercise = async (_req: Request, res: Response): Promise<void
   }
 
   res.status(204).end();
+};
+
+// ─── Template Handlers ────────────────────────────────────────────────────────
+
+export const listTemplates = async (_req: Request, res: Response): Promise<void> => {
+  const { category } = res.locals.validated!.query as { category?: string };
+  const templates = category
+    ? PROGRAM_TEMPLATES.filter((t) => t.category === category)
+    : PROGRAM_TEMPLATES;
+  // Return summary only (no weeks data)
+  const summaries = templates.map(
+    ({ id, name, description, weeksCount, daysPerWeek, difficulty, category: cat, tags }) => ({
+      id,
+      name,
+      description,
+      weeksCount,
+      daysPerWeek,
+      difficulty,
+      category: cat,
+      tags,
+    }),
+  );
+  sendSuccess(res, { templates: summaries });
+};
+
+export const getTemplate = async (_req: Request, res: Response): Promise<void> => {
+  const { templateId } = res.locals.validated!.params as { templateId: string };
+  const template = PROGRAM_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) throw new AppError(404, 'Template not found');
+  sendSuccess(res, { template });
+};
+
+export const importTemplate = async (_req: Request, res: Response): Promise<void> => {
+  const { templateId } = res.locals.validated!.params as { templateId: string };
+  const body = res.locals.validated!.body as {
+    name?: string;
+    squatMax?: number;
+    benchMax?: number;
+    deadliftMax?: number;
+    ohpMax?: number;
+    activate?: boolean;
+  };
+  const { userId } = res.locals.auth!;
+
+  const template = PROGRAM_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) throw new AppError(404, 'Template not found');
+
+  // Collect all unique exercise names referenced in this template
+  const exerciseNames = [
+    ...new Set(
+      template.weeks.flatMap((w) => w.days.flatMap((d) => d.exercises.map((e) => e.exerciseName))),
+    ),
+  ];
+
+  // Batch-resolve exercise IDs. All must exist in the DB.
+  const exercises = await prisma.exercise.findMany({
+    where: { name: { in: exerciseNames }, isCustom: false },
+    select: { id: true, name: true },
+  });
+  const exerciseIdByName = new Map(exercises.map((e) => [e.name, e.id]));
+  const missing = exerciseNames.filter((n) => !exerciseIdByName.has(n));
+  if (missing.length > 0) {
+    throw new AppError(500, `Template references unknown exercises: ${missing.join(', ')}`);
+  }
+
+  const plan = await prisma.$transaction(async (tx) => {
+    // Upsert PRs if user provided their 1RMs.
+    // Map template exercise names to their DB IDs for PR creation.
+    const prUpserts: { exerciseName: string; weightKg: number }[] = [
+      body.squatMax ? { exerciseName: 'Low Bar Back Squat', weightKg: body.squatMax } : null,
+      body.benchMax ? { exerciseName: 'Competition Bench Press', weightKg: body.benchMax } : null,
+      body.deadliftMax ? { exerciseName: 'Conventional Deadlift', weightKg: body.deadliftMax } : null,
+      body.ohpMax ? { exerciseName: 'Overhead Press', weightKg: body.ohpMax } : null,
+    ].filter((p): p is { exerciseName: string; weightKg: number } => p !== null);
+
+    for (const { exerciseName, weightKg } of prUpserts) {
+      const exId = exerciseIdByName.get(exerciseName);
+      if (!exId) continue;
+      // Only upsert if the new value is better than the existing PR.
+      const existing = await tx.personalRecord.findFirst({
+        where: { userId, exerciseId: exId, recordType: 'max_weight' },
+        orderBy: { value: 'desc' },
+        select: { id: true, value: true },
+      });
+      if (!existing) {
+        await tx.personalRecord.create({
+          data: {
+            userId,
+            exerciseId: exId,
+            recordType: 'max_weight',
+            value: weightKg,
+            achievedAt: new Date(),
+          },
+        });
+      } else if (weightKg > existing.value) {
+        await tx.personalRecord.update({
+          where: { id: existing.id },
+          data: { value: weightKg, achievedAt: new Date() },
+        });
+      }
+    }
+
+    // Create the plan with all weeks/days/exercises
+    return tx.workoutPlan.create({
+      data: {
+        userId,
+        name: body.name ?? template.name,
+        description: template.description,
+        isActive: body.activate ?? true,
+        scheduleType: 'recurring',
+        weeksCount: template.weeksCount,
+        planDays: {
+          create: template.weeks.flatMap((week) =>
+            week.days.map((day) => ({
+              dayOfWeek: day.dayOfWeek,
+              weekNumber: week.weekNumber,
+              name: day.name,
+              sortOrder: day.sortOrder,
+              exercises: {
+                create: day.exercises.map((ex) => {
+                  const exId = exerciseIdByName.get(ex.exerciseName);
+                  if (!exId) {
+                    throw new AppError(500, `Exercise not found during plan creation: ${ex.exerciseName}`);
+                  }
+                  return {
+                    exerciseId: exId,
+                    sortOrder: ex.sortOrder,
+                    targetSets: ex.targetSets,
+                    targetReps: ex.targetReps ?? null,
+                    targetWeightPct1rm: ex.targetWeightPct1rm ?? null,
+                    targetRpe: ex.targetRpe ?? null,
+                    targetDurationSec: ex.targetDurationSec ?? null,
+                    targetDistanceM: ex.targetDistanceM ?? null,
+                    notes: ex.notes ?? null,
+                  };
+                }),
+              },
+            })),
+          ),
+        },
+      },
+      include: planDetailInclude,
+    });
+  });
+
+  sendSuccess(res, { plan: mapPlanDetail(plan) }, 201);
 };

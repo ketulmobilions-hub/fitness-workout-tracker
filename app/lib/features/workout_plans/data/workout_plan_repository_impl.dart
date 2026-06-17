@@ -721,6 +721,100 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Templates
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<List<ProgramTemplateSummary>> listTemplates({String? category}) async {
+    final envelope = await _apiClient.listTemplates(category: category);
+    return envelope.data.templates
+        .map(
+          (dto) => ProgramTemplateSummary(
+            id: dto.id,
+            name: dto.name,
+            description: dto.description,
+            weeksCount: dto.weeksCount,
+            daysPerWeek: dto.daysPerWeek,
+            difficulty: dto.difficulty,
+            category: dto.category,
+            tags: dto.tags,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<ProgramTemplate> getTemplate(String templateId) async {
+    final envelope = await _apiClient.getTemplate(templateId);
+    final dto = envelope.data.template;
+    return ProgramTemplate(
+      id: dto.id,
+      name: dto.name,
+      description: dto.description,
+      weeksCount: dto.weeksCount,
+      daysPerWeek: dto.daysPerWeek,
+      difficulty: dto.difficulty,
+      category: dto.category,
+      tags: dto.tags,
+      weeks: dto.weeks
+          .map(
+            (w) => TemplateWeek(
+              weekNumber: w.weekNumber,
+              days: w.days
+                  .map(
+                    (d) => TemplateDay(
+                      dayOfWeek: d.dayOfWeek,
+                      name: d.name,
+                      sortOrder: d.sortOrder,
+                      exercises: d.exercises
+                          .map(
+                            (e) => TemplateExercise(
+                              exerciseName: e.exerciseName,
+                              sortOrder: e.sortOrder,
+                              targetSets: e.targetSets,
+                              targetReps: e.targetReps,
+                              targetWeightPct1rm: e.targetWeightPct1rm,
+                              targetRpe: e.targetRpe,
+                              notes: e.notes,
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  )
+                  .toList(),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<TemplateImportResult> importTemplate({
+    required String templateId,
+    String? name,
+    double? squatMax,
+    double? benchMax,
+    double? deadliftMax,
+    double? ohpMax,
+  }) async {
+    final envelope = await _apiClient.importTemplate(
+      templateId,
+      ImportTemplateRequestDto(
+        name: name,
+        squatMax: squatMax,
+        benchMax: benchMax,
+        deadliftMax: deadliftMax,
+        ohpMax: ohpMax,
+      ),
+    );
+    final planId = envelope.data.plan.id;
+    // Persist the plan + all days/exercises to Drift so the plan detail
+    // screen can read from the local DB immediately after navigation.
+    await syncPlanDetail(planId);
+    return TemplateImportResult(planId: planId);
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 

@@ -16,6 +16,13 @@ class PlanListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Plans'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            tooltip: 'Browse Templates',
+            onPressed: () => context.push(AppRoutes.planTemplates),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Create plan',
