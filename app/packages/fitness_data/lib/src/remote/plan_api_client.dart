@@ -42,6 +42,17 @@ abstract class PlanApiClient {
   Future<void> deletePlan(@Path('id') String id);
 
   // -------------------------------------------------------------------------
+  // Write — plan day metadata (isDeload, name)
+  // -------------------------------------------------------------------------
+
+  @PATCH('/api/v1/plans/{planId}/days/{dayId}')
+  Future<PlanDayUpdateEnvelopeDto> updatePlanDay(
+    @Path('planId') String planId,
+    @Path('dayId') String dayId,
+    @Body() UpdatePlanDayRequestDto body,
+  );
+
+  // -------------------------------------------------------------------------
   // Write — exercises within a plan day
   // -------------------------------------------------------------------------
 

@@ -37,8 +37,25 @@ const daySchema = z.object({
   // weekNumber is used for multi-week recurring plans (week 1, week 2, …)
   weekNumber: z.number().int().min(1).optional(),
   name: z.string().min(1).max(100).optional(),
+  isDeload: z.boolean().optional(),
   sortOrder: z.number().int().min(0),
 });
+
+const planDayParamsSchema = z.object({
+  id: z.string().uuid(),
+  dayId: z.string().uuid(),
+});
+
+const updatePlanDayBodySchema = z
+  .object({
+    isDeload: z.boolean().optional(),
+    name: z.string().min(1).max(100).nullable().optional(),
+  })
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
+    message: 'At least one field must be provided',
+    // Note: semantic no-ops (e.g. isDeload: false on an already-false day) are
+    // allowed through — we can't detect them without a DB read at schema time.
+  });
 
 const createPlanBodySchema = z
   .object({
@@ -177,6 +194,9 @@ router.get('/', validate({ query: listPlansQuerySchema }), plan.listPlans);
 router.get('/:id', validate({ params: planParamsSchema }), plan.getPlan);
 router.patch('/:id', validate({ params: planParamsSchema, body: updatePlanBodySchema }), plan.updatePlan);
 router.delete('/:id', validate({ params: planParamsSchema }), plan.deletePlan);
+
+// Plan day sub-routes (day metadata — isDeload, name)
+router.patch('/:id/days/:dayId', validate({ params: planDayParamsSchema, body: updatePlanDayBodySchema }), plan.updatePlanDay);
 
 // Exercise sub-routes
 // NOTE: /reorder must be registered before /:planDayExId to avoid being caught as a param

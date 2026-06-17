@@ -188,6 +188,7 @@ model PlanDay {
   dayOfWeek  Int     @map("day_of_week")
   weekNumber Int?    @map("week_number")
   name       String?
+  isDeload   Boolean  @default(false) @map("is_deload")
   sortOrder  Int      @map("sort_order")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")

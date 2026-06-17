@@ -43,6 +43,7 @@ abstract class PlanDayDto with _$PlanDayDto {
     required int dayOfWeek,
     int? weekNumber,
     String? name,
+    @Default(false) bool isDeload,
     required int sortOrder,
     @Default([]) List<PlanDayExerciseDto> exercises,
   }) = _PlanDayDto;
@@ -71,6 +72,31 @@ abstract class PlanDto with _$PlanDto {
 
   factory PlanDto.fromJson(Map<String, dynamic> json) =>
       _$PlanDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
+// Plan day update endpoint envelope: { "status": 200, "data": { "day": {...} } }
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class PlanDayUpdateDataDto with _$PlanDayUpdateDataDto {
+  const factory PlanDayUpdateDataDto({
+    required PlanDayDto day,
+  }) = _PlanDayUpdateDataDto;
+
+  factory PlanDayUpdateDataDto.fromJson(Map<String, dynamic> json) =>
+      _$PlanDayUpdateDataDtoFromJson(json);
+}
+
+@freezed
+abstract class PlanDayUpdateEnvelopeDto with _$PlanDayUpdateEnvelopeDto {
+  const factory PlanDayUpdateEnvelopeDto({
+    required int status,
+    required PlanDayUpdateDataDto data,
+  }) = _PlanDayUpdateEnvelopeDto;
+
+  factory PlanDayUpdateEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$PlanDayUpdateEnvelopeDtoFromJson(json);
 }
 
 // ---------------------------------------------------------------------------

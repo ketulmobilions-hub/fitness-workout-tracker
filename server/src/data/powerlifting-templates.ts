@@ -15,6 +15,7 @@ export interface TemplateExercise {
 export interface TemplateDay {
   dayOfWeek: number; // 0=Sun, 1=Mon, ... 6=Sat
   name: string;
+  isDeload: boolean;
   sortOrder: number;
   exercises: TemplateExercise[];
 }
@@ -195,6 +196,7 @@ function buildBbbDay(dayConfig: BbbDayConfig, daySortOrder: number, weekCfg: Wav
   return {
     dayOfWeek: dayConfig.dayOfWeek,
     name: dayConfig.name,
+    isDeload: weekCfg.isDeload,
     sortOrder: daySortOrder,
     exercises,
   };
@@ -350,7 +352,11 @@ function buildGzclpWeeks(): TemplateWeek[] {
 
     weeks.push({
       weekNumber: week,
-      days: [monday, wednesday, friday].map((d, i) => ({ ...d, sortOrder: i })),
+      days: [monday, wednesday, friday].map((d, i) => ({
+        ...d,
+        isDeload: false,
+        sortOrder: i,
+      })),
     });
   }
 
@@ -386,6 +392,7 @@ function buildBridgeDay1(cfg: BridgeWeekConfig, sortOrder: number): TemplateDay 
   return {
     dayOfWeek: 1, // Monday
     name: 'Day 1 — Squat Focus',
+    isDeload: cfg.isDeload,
     sortOrder,
     exercises: [
       // 2 back-off sets then 1 top set
@@ -439,6 +446,7 @@ function buildBridgeDay2(cfg: BridgeWeekConfig, sortOrder: number): TemplateDay 
   return {
     dayOfWeek: 2, // Tuesday
     name: 'Day 2 — Bench Focus',
+    isDeload: cfg.isDeload,
     sortOrder,
     exercises: [
       {
@@ -491,6 +499,7 @@ function buildBridgeDay3(cfg: BridgeWeekConfig, sortOrder: number): TemplateDay 
   return {
     dayOfWeek: 4, // Thursday
     name: 'Day 3 — Deadlift Focus',
+    isDeload: cfg.isDeload,
     sortOrder,
     exercises: [
       {
@@ -534,6 +543,7 @@ function buildBridgeDay4(cfg: BridgeWeekConfig, sortOrder: number): TemplateDay 
   return {
     dayOfWeek: 5, // Friday
     name: 'Day 4 — OHP & Squat Variation',
+    isDeload: cfg.isDeload,
     sortOrder,
     exercises: [
       {

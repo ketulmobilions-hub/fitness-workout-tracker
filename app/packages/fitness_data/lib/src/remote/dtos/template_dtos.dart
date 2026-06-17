@@ -27,6 +27,7 @@ abstract class TemplateDayDto with _$TemplateDayDto {
     required int dayOfWeek,
     required String name,
     required int sortOrder,
+    @Default(false) bool isDeload,
     @Default([]) List<TemplateExerciseDto> exercises,
   }) = _TemplateDayDto;
 

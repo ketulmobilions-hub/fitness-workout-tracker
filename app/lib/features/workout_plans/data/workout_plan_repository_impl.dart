@@ -69,6 +69,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
             dayOfWeek: dayRow.dayOfWeek,
             weekNumber: dayRow.weekNumber == 0 ? null : dayRow.weekNumber,
             name: dayRow.name,
+            isDeload: dayRow.isDeload,
             sortOrder: dayRow.sortOrder,
             exercises: exercises,
           );
@@ -139,6 +140,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
             // authoritative note on this convention.
             weekNumber: Value(day.weekNumber ?? 0),
             name: Value(day.name),
+            isDeload: Value(day.isDeload),
             sortOrder: Value(day.sortOrder),
             updatedAt: Value(DateTime.now()),
           ),
@@ -218,6 +220,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
                 dayOfWeek: d.dayOfWeek,
                 weekNumber: d.weekNumber,
                 name: d.name,
+                isDeload: d.isDeload,
                 sortOrder: d.sortOrder,
               ),
             )
@@ -249,6 +252,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
             dayOfWeek: Value(day.dayOfWeek),
             weekNumber: Value(day.weekNumber ?? 0),
             name: Value(day.name),
+            isDeload: Value(day.isDeload),
             sortOrder: Value(day.sortOrder),
             updatedAt: Value(now),
           ),
@@ -269,6 +273,16 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
           'isActive': false,
           'scheduleType': scheduleTypeStr,
           if (weeksCount != null) 'weeksCount': weeksCount,
+          if (initialDays != null && initialDays.isNotEmpty)
+            'days': initialDays
+                .map((d) => {
+                      'dayOfWeek': d.dayOfWeek,
+                      if (d.weekNumber != null) 'weekNumber': d.weekNumber,
+                      if (d.name != null) 'name': d.name,
+                      'isDeload': d.isDeload,
+                      'sortOrder': d.sortOrder,
+                    })
+                .toList(),
         },
       );
     }
@@ -381,6 +395,76 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
         payload: {},
       );
     }
+  }
+
+  @override
+  Future<PlanDay> updatePlanDay({
+    required String planId,
+    required String dayId,
+    bool? isDeload,
+    String? name,
+  }) async {
+    // ── Write locally first (offline-first) ──────────────────────────────────
+    await _planDao.upsertPlanDay(PlanDaysCompanion(
+      id: Value(dayId),
+      isDeload: isDeload != null ? Value(isDeload) : const Value.absent(),
+      name: name != null ? Value(name) : const Value.absent(),
+      updatedAt: Value(DateTime.now()),
+    ));
+
+    // ── Sync to server (best-effort) ─────────────────────────────────────────
+    try {
+      final body = UpdatePlanDayRequestDto(isDeload: isDeload, name: name);
+      final dto =
+          (await _apiClient.updatePlanDay(planId, dayId, body)).data.day;
+      await _planDao.upsertPlanDay(PlanDaysCompanion(
+        id: Value(dto.id),
+        planId: Value(planId),
+        dayOfWeek: Value(dto.dayOfWeek),
+        weekNumber: Value(dto.weekNumber ?? 0),
+        name: Value(dto.name),
+        isDeload: Value(dto.isDeload),
+        sortOrder: Value(dto.sortOrder),
+        updatedAt: Value(DateTime.now()),
+      ));
+      return PlanDay(
+        id: dto.id,
+        dayOfWeek: dto.dayOfWeek,
+        weekNumber: dto.weekNumber,
+        name: dto.name,
+        isDeload: dto.isDeload,
+        sortOrder: dto.sortOrder,
+      );
+    } catch (e) {
+      debugPrint('WorkoutPlanRepository: updatePlanDay server sync failed: $e');
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'plan_days',
+        recordId: dayId,
+        operation: SyncOperation.update,
+        payload: {
+          if (isDeload != null) 'isDeload': isDeload,
+          if (name != null) 'name': name,
+        },
+      );
+    }
+
+    // Offline fallback — read updated row from Drift.
+    final localDays = await _planDao.getDaysForPlan(planId);
+    final row = localDays.firstWhere(
+      (d) => d.id == dayId,
+      orElse: () => throw StateError(
+          'updatePlanDay: day $dayId not found in local DB after write'),
+    );
+    return PlanDay(
+      id: row.id,
+      dayOfWeek: row.dayOfWeek,
+      weekNumber: row.weekNumber == 0 ? null : row.weekNumber,
+      name: row.name,
+      isDeload: row.isDeload,
+      sortOrder: row.sortOrder,
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -766,6 +850,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
                       dayOfWeek: d.dayOfWeek,
                       name: d.name,
                       sortOrder: d.sortOrder,
+                      isDeload: d.isDeload,
                       exercises: d.exercises
                           .map(
                             (e) => TemplateExercise(
@@ -865,6 +950,7 @@ class WorkoutPlanRepositoryImpl implements WorkoutPlanRepository {
               dayOfWeek: d.dayOfWeek,
               weekNumber: d.weekNumber,
               name: d.name,
+              isDeload: d.isDeload,
               sortOrder: d.sortOrder,
               exercises: d.exercises.map(_dtoToExerciseDomain).toList(),
             ),

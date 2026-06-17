@@ -51,6 +51,17 @@ abstract class WorkoutPlanRepository {
   /// local Drift database.
   Future<void> deletePlan(String id);
 
+  /// Updates metadata on a single plan day (e.g. toggles [isDeload] or renames
+  /// it). At least one of [isDeload] or [name] must be non-null.
+  /// Returns the updated [PlanDay] (exercises list will be empty — callers that
+  /// need exercises should watch the plan stream instead).
+  Future<PlanDay> updatePlanDay({
+    required String planId,
+    required String dayId,
+    bool? isDeload,
+    String? name,
+  });
+
   // -------------------------------------------------------------------------
   // Write — exercises within a plan day
   // -------------------------------------------------------------------------
