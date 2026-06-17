@@ -15,11 +15,14 @@ enum UnitsPreference { metric, imperial }
 
 enum ThemePreference { light, dark, system }
 
+enum ScoreSystem { wilks, dots, ipfGl }
+
 @freezed
 abstract class UserPreferences with _$UserPreferences {
   const factory UserPreferences({
     @Default(UnitsPreference.metric) UnitsPreference units,
     @Default(ThemePreference.system) ThemePreference theme,
     @Default(NotificationPreferences()) NotificationPreferences notifications,
+    @Default(ScoreSystem.dots) ScoreSystem scoreSystem,
   }) = _UserPreferences;
 }

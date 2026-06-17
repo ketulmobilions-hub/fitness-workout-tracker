@@ -24,6 +24,7 @@ abstract class UserPreferencesDto with _$UserPreferencesDto {
   const factory UserPreferencesDto({
     @Default('metric') String units,
     @Default('system') String theme,
+    @Default('dots') String scoreSystem,
     @Default(NotificationPreferencesDto()) NotificationPreferencesDto notifications,
   }) = _UserPreferencesDto;
 
@@ -153,6 +154,7 @@ abstract class UpdatePreferencesRequestDto with _$UpdatePreferencesRequestDto {
   const factory UpdatePreferencesRequestDto({
     String? units,
     String? theme,
+    String? scoreSystem,
     UpdateNotificationPreferencesDto? notifications,
   }) = _UpdatePreferencesRequestDto;
 

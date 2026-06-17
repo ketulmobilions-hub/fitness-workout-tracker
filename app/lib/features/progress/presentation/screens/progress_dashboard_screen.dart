@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../profile/providers/profile_providers.dart';
 import '../../../streak/providers/streak_providers.dart';
 import '../../providers/progress_providers.dart';
 import '../widgets/date_range_selector.dart';
@@ -29,6 +30,8 @@ class _ProgressDashboardScreenState
     final volumeAsync = ref.watch(
       volumeDataProvider(volumePeriodToApiParam(_volumePeriod)),
     );
+    final profileAsync = ref.watch(profileStreamProvider);
+    final scoreSystem = profileAsync.value?.preferences.scoreSystem ?? ScoreSystem.dots;
 
     // Trigger milestone celebration when a new milestone is reached.
     ref.listen(streakStreamProvider, (_, next) {
@@ -88,6 +91,18 @@ class _ProgressDashboardScreenState
                 ),
                 data: (overview) => _OverviewSection(overview: overview),
               ),
+            ),
+
+            // Strength score card — only rendered when data is available.
+            // whenOrNull returns null for loading/error states; fall back to
+            // SizedBox.shrink() so no gap appears while the overview loads.
+            SliverToBoxAdapter(
+              child: overviewAsync.whenOrNull(
+                data: (overview) => _StrengthScoreCard(
+                  overview: overview,
+                  scoreSystem: scoreSystem,
+                ),
+              ) ?? const SizedBox.shrink(),
             ),
 
             // Volume chart
@@ -373,6 +388,186 @@ class _StatTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Strength score card
+// ---------------------------------------------------------------------------
+
+class _StrengthScoreCard extends StatelessWidget {
+  const _StrengthScoreCard({
+    required this.overview,
+    required this.scoreSystem,
+  });
+
+  final ProgressOverview overview;
+  final ScoreSystem scoreSystem;
+
+  double? get _score => switch (scoreSystem) {
+    ScoreSystem.wilks => overview.wilks,
+    ScoreSystem.dots => overview.dots,
+    ScoreSystem.ipfGl => overview.ipfGl,
+  };
+
+  String get _label => switch (scoreSystem) {
+    ScoreSystem.wilks => 'Wilks',
+    ScoreSystem.dots => 'Dots',
+    ScoreSystem.ipfGl => 'IPF GL',
+  };
+
+  // IPF GL uses a ~60–120 scale; Wilks/Dots use a ~200–500 scale.
+  // Separate thresholds prevent IPF GL athletes from always showing 'Beginner'.
+  String _bandLabel(double score) {
+    if (scoreSystem == ScoreSystem.ipfGl) {
+      if (score >= 85) return 'Elite';
+      if (score >= 70) return 'Advanced';
+      if (score >= 50) return 'Intermediate';
+      return 'Beginner';
+    }
+    if (score >= 400) return 'Elite';
+    if (score >= 300) return 'Advanced';
+    if (score >= 200) return 'Intermediate';
+    return 'Beginner';
+  }
+
+  Color _bandColor(double score, ColorScheme cs) {
+    final band = _bandLabel(score);
+    return switch (band) {
+      'Elite' => Colors.purple,
+      'Advanced' => cs.primary,
+      'Intermediate' => Colors.orange,
+      _ => cs.onSurfaceVariant,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final score = _score;
+    // Only show the card when the score is available — avoids a confusing
+    // empty placeholder for athletes who haven't set up their competition
+    // profile or logged SBD lifts yet.
+    if (score == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final band = _bandLabel(score);
+    final bandColor = _bandColor(score, cs);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.leaderboard_outlined, size: 20, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Strength Score',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    score.toStringAsFixed(1),
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      _label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: bandColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      band,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: bandColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _BenchmarkBar(score: score, scoreSystem: scoreSystem),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Beginner', style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(
+                    scoreSystem == ScoreSystem.ipfGl ? 'Elite (85+)' : 'Elite (400+)',
+                    style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BenchmarkBar extends StatelessWidget {
+  const _BenchmarkBar({required this.score, required this.scoreSystem});
+
+  final double score;
+  final ScoreSystem scoreSystem;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // Scale the progress bar to the relevant max for each system so the
+    // indicator position is visually meaningful across different score ranges.
+    final maxScore = scoreSystem == ScoreSystem.ipfGl ? 120.0 : 500.0;
+    final progress = (score / maxScore).clamp(0.0, 1.0);
+    final isElite = scoreSystem == ScoreSystem.ipfGl ? score >= 85 : score >= 400;
+    final isAdvanced = scoreSystem == ScoreSystem.ipfGl ? score >= 70 : score >= 300;
+    final isIntermediate = scoreSystem == ScoreSystem.ipfGl ? score >= 50 : score >= 200;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: LinearProgressIndicator(
+        value: progress,
+        minHeight: 8,
+        backgroundColor: cs.surfaceContainerHighest,
+        valueColor: AlwaysStoppedAnimation<Color>(
+          isElite
+              ? Colors.purple
+              : isAdvanced
+                  ? cs.primary
+                  : isIntermediate
+                      ? Colors.orange
+                      : cs.onSurfaceVariant,
         ),
       ),
     );

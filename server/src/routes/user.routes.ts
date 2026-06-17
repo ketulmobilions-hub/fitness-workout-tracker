@@ -44,6 +44,7 @@ const updatePreferencesBody = z
   .object({
     units: z.enum(['metric', 'imperial']).optional(),
     theme: z.enum(['light', 'dark', 'system']).optional(),
+    scoreSystem: z.enum(['wilks', 'dots', 'ipfGl']).optional(),
     notifications: z
       .object({
         workoutReminders: z.boolean().optional(),
@@ -52,9 +53,18 @@ const updatePreferencesBody = z
       })
       .optional(),
   })
-  .refine((data) => Object.values(data).some((v) => v !== undefined), {
-    message: 'At least one preference field must be provided',
-  });
+  .refine((data) => {
+    // An empty `notifications: {}` object counts as nothing — the client sent
+    // no notification keys to change. Treat it the same as an absent field so
+    // the handler never receives a no-op update that passes validation.
+    const notificationsEmpty =
+      data.notifications !== undefined &&
+      Object.values(data.notifications).every((v) => v === undefined);
+    const effectiveData = notificationsEmpty
+      ? { ...data, notifications: undefined }
+      : data;
+    return Object.values(effectiveData).some((v) => v !== undefined);
+  }, { message: 'At least one preference field must be provided' });
 
 const deleteAccountBody = z.object({
   password: z.string().min(1).optional(),         // email accounts

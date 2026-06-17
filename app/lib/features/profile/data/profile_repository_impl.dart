@@ -144,6 +144,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
             ThemePreference.dark => 'dark',
             ThemePreference.system => 'system',
           },
+          scoreSystem: switch (prefs.scoreSystem) {
+            ScoreSystem.wilks => 'wilks',
+            ScoreSystem.ipfGl => 'ipfGl',
+            ScoreSystem.dots => 'dots',
+          },
           notifications: data.UpdateNotificationPreferencesDto(
             workoutReminders: prefs.notifications.workoutReminders,
             streakAlerts: prefs.notifications.streakAlerts,
@@ -271,6 +276,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
         'dark' => ThemePreference.dark,
         _ => ThemePreference.system,
       },
+      scoreSystem: switch (dto.scoreSystem) {
+        'wilks' => ScoreSystem.wilks,
+        'ipfGl' => ScoreSystem.ipfGl,
+        _ => ScoreSystem.dots,
+      },
       notifications: NotificationPreferences(
         workoutReminders: dto.notifications.workoutReminders,
         streakAlerts: dto.notifications.streakAlerts,
@@ -299,6 +309,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
         _ => ThemePreference.system,
       },
       notifications: notifications,
+      scoreSystem: switch (map['scoreSystem'] as String?) {
+        'wilks' => ScoreSystem.wilks,
+        'ipfGl' => ScoreSystem.ipfGl,
+        _ => ScoreSystem.dots,
+      },
     );
   }
 
@@ -306,6 +321,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return {
       'units': dto.units,
       'theme': dto.theme,
+      'scoreSystem': dto.scoreSystem,
       'notifications': {
         'workoutReminders': dto.notifications.workoutReminders,
         'streakAlerts': dto.notifications.streakAlerts,
@@ -321,6 +337,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
         ThemePreference.light => 'light',
         ThemePreference.dark => 'dark',
         ThemePreference.system => 'system',
+      },
+      'scoreSystem': switch (prefs.scoreSystem) {
+        ScoreSystem.wilks => 'wilks',
+        ScoreSystem.ipfGl => 'ipfGl',
+        ScoreSystem.dots => 'dots',
       },
       'notifications': {
         'workoutReminders': prefs.notifications.workoutReminders,

@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma.js';
 import { AppError } from '../utils/errors.js';
 import { sendSuccess } from '../utils/response.js';
 import { estimateOneRepMax } from '../utils/oneRmCalculator.js';
+import { computeAllScores } from '../utils/strengthScores.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,11 @@ type ExerciseHistoryEntry = {
 
 type VolumeSumRow = {
   volume: string;
+};
+
+type SbdBestRow = {
+  category: 'squat' | 'bench' | 'deadlift';
+  best_kg: string;
 };
 
 type ExerciseHistoryRow = {
@@ -137,7 +143,7 @@ export const getOverview = async (_req: Request, res: Response): Promise<void> =
   const weekStart = getLocalPeriodStart('week', utcOffset);
   const monthStart = getLocalPeriodStart('month', utcOffset);
 
-  const [totalWorkouts, weekVolumeRows, monthVolumeRows, streak] = await Promise.all([
+  const [totalWorkouts, weekVolumeRows, monthVolumeRows, streak, user] = await Promise.all([
     // Count only completed sessions — abandoned/in-progress are not real workouts
     prisma.workoutSession.count({
       where: { userId, status: 'completed' },
@@ -170,7 +176,60 @@ export const getOverview = async (_req: Request, res: Response): Promise<void> =
       where: { userId },
       select: { currentStreak: true, longestStreak: true, lastWorkoutDate: true },
     }),
+    // Fetch competition profile fields needed to compute strength scores.
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { bodyweightKg: true, gender: true },
+    }),
   ]);
+
+  // Only query SBD PRs when we have the profile data needed to use them.
+  // Avoids a wasted JOIN + aggregate on every overview load for athletes who
+  // haven't set up their competition profile yet.
+  let sbdRows: SbdBestRow[] = [];
+  if (user?.bodyweightKg && user?.gender) {
+    sbdRows = await prisma.$queryRaw<SbdBestRow[]>`
+      SELECT
+        CASE
+          WHEN e.name ILIKE '%squat%' AND e.name NOT ILIKE '%hack squat%'
+               AND e.name NOT ILIKE '%belt squat%' THEN 'squat'
+          WHEN e.name ILIKE '%bench press%' THEN 'bench'
+          WHEN e.name ILIKE '%deadlift%' AND e.name NOT ILIKE '%romanian%'
+               AND e.name NOT ILIKE '%stiff%' AND e.name NOT ILIKE '%trap bar%' THEN 'deadlift'
+        END AS category,
+        MAX(pr.value) AS best_kg
+      FROM personal_records pr
+      JOIN exercises e ON e.id = pr.exercise_id
+      WHERE pr.user_id = ${userId}::uuid
+        AND pr.record_type = 'max_weight'
+        AND (
+          (e.name ILIKE '%squat%' AND e.name NOT ILIKE '%hack squat%'
+           AND e.name NOT ILIKE '%belt squat%') OR
+          (e.name ILIKE '%bench press%') OR
+          (e.name ILIKE '%deadlift%' AND e.name NOT ILIKE '%romanian%'
+           AND e.name NOT ILIKE '%stiff%' AND e.name NOT ILIKE '%trap bar%')
+        )
+      GROUP BY category
+      HAVING MAX(pr.value) IS NOT NULL
+    `;
+  }
+
+  // Scores are estimated from best all-time PRs per lift (not a real competition
+  // total) — flag this so clients can surface an "estimated" label in the UI.
+  let strengthScores: { wilks: number | null; dots: number | null; ipfGl: number | null } | null = null;
+  if (user?.bodyweightKg && user?.gender) {
+    const byCategory: Record<string, number> = {};
+    for (const row of sbdRows) {
+      if (row.category) byCategory[row.category] = Number(row.best_kg);
+    }
+    const { squat, bench, deadlift } = { squat: byCategory['squat'], bench: byCategory['bench'], deadlift: byCategory['deadlift'] };
+    // Require all three lifts for a meaningful total — a partial total would
+    // drastically understate the score and confuse athletes.
+    if (squat != null && bench != null && deadlift != null) {
+      const total = squat + bench + deadlift;
+      strengthScores = computeAllScores(total, user.bodyweightKg, user.gender);
+    }
+  }
 
   sendSuccess(res, {
     totalWorkouts,
@@ -179,6 +238,10 @@ export const getOverview = async (_req: Request, res: Response): Promise<void> =
     currentStreak: streak?.currentStreak ?? 0,
     longestStreak: streak?.longestStreak ?? 0,
     lastWorkoutDate: streak?.lastWorkoutDate ? toDateString(streak.lastWorkoutDate) : null,
+    wilks: strengthScores?.wilks ?? null,
+    dots: strengthScores?.dots ?? null,
+    ipfGl: strengthScores?.ipfGl ?? null,
+    strengthScoresEstimated: strengthScores !== null,
   });
 };
 

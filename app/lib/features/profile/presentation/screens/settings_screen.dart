@@ -107,6 +107,42 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            // Score system
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Strength Score System',
+                      style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Shown on your progress dashboard',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<ScoreSystem>(
+                    segments: const [
+                      ButtonSegment(
+                          value: ScoreSystem.dots, label: Text('Dots')),
+                      ButtonSegment(
+                          value: ScoreSystem.wilks, label: Text('Wilks')),
+                      ButtonSegment(
+                          value: ScoreSystem.ipfGl, label: Text('IPF GL')),
+                    ],
+                    selected: {prefs.scoreSystem},
+                    onSelectionChanged: (v) => _updatePrefs(
+                        context, ref, userId,
+                        prefs.copyWith(scoreSystem: v.first)),
+                  ),
+                ],
+              ),
+            ),
             // Notifications
             const _SectionSubHeader(title: 'Notifications'),
             SwitchListTile(
@@ -210,8 +246,6 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  // Issue #11: preference errors are now shown to the user via a SnackBar
-  // instead of being silently discarded.
   Future<void> _updatePrefs(
     BuildContext context,
     WidgetRef ref,
@@ -220,7 +254,7 @@ class SettingsScreen extends ConsumerWidget {
   ) async {
     if (userId == null) return;
     try {
-      await ref.read(profileRepositoryProvider).updatePreferences(userId, prefs);
+      await ref.read(profileMutationsProvider.notifier).updatePreferences(userId, prefs);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

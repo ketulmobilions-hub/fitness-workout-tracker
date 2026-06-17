@@ -86,3 +86,19 @@ Stream<UserProfile?> profileStream(Ref ref) {
 Future<UserStats> userStats(Ref ref) async {
   return ref.watch(profileRepositoryProvider).getStats();
 }
+
+/// Thin notifier that proxies preference mutations through the repository.
+/// Keeps Presentation widgets from touching the repository directly, which
+/// would violate the VGV layer boundary.
+@Riverpod(keepAlive: true)
+class ProfileMutations extends _$ProfileMutations {
+  @override
+  void build() {}
+
+  Future<UserPreferences> updatePreferences(
+    String userId,
+    UserPreferences prefs,
+  ) {
+    return ref.read(profileRepositoryProvider).updatePreferences(userId, prefs);
+  }
+}
