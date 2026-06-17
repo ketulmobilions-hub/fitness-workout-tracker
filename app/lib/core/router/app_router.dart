@@ -14,6 +14,7 @@ import '../../features/exercises/presentation/screens/create_exercise_screen.dar
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
 import '../../features/active_session/active_session.dart';
+import '../../features/profile/presentation/screens/competition_profile_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/profile/presentation/screens/settings_screen.dart';
@@ -306,11 +307,16 @@ GoRouter appRouter(Ref ref) {
       ),
 
       // Profile sub-pages
-      // Static segment 'edit' must come BEFORE parameterized siblings.
+      // Static segments must come BEFORE parameterized siblings.
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: AppRoutes.editProfile,
         builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.competitionProfile,
+        builder: (context, state) => const CompetitionProfileScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

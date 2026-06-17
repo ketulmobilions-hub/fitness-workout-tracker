@@ -2,18 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:fitness_data/fitness_data.dart' as data;
 import 'package:fitness_domain/fitness_domain.dart';
+import 'package:flutter/foundation.dart';
+
+import '../../../core/sync/sync_service.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   ProfileRepositoryImpl({
     required data.UserApiClient apiClient,
     required data.UserDao userDao,
+    required data.SyncQueueDao syncQueueDao,
+    required String userId,
     required Future<void> Function() clearTokens,
   })  : _apiClient = apiClient,
         _userDao = userDao,
+        _syncDao = syncQueueDao,
+        _userId = userId,
         _clearTokens = clearTokens;
 
   final data.UserApiClient _apiClient;
   final data.UserDao _userDao;
+  final data.SyncQueueDao _syncDao;
+  final String _userId;
   final Future<void> Function() _clearTokens;
 
   @override
@@ -66,6 +75,62 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<UserProfile> updateCompetitionProfile({
+    String? federation,
+    String? division,
+    double? weightClassKg,
+    double? bodyweightKg,
+    String? gender,
+  }) async {
+    // Optimistic local write so UI reflects the change immediately.
+    await _userDao.upsertUser(data.UsersCompanion(
+      id: Value(_userId),
+      federation: Value(federation),
+      division: Value(division),
+      weightClassKg: Value(weightClassKg),
+      bodyweightKg: Value(bodyweightKg),
+      gender: Value(gender),
+      updatedAt: Value(DateTime.now()),
+    ));
+
+    try {
+      final envelope = await _apiClient.updateCompetitionProfile(
+        data.UpdateCompetitionProfileRequestDto(
+          federation: federation,
+          division: division,
+          weightClassKg: weightClassKg,
+          bodyweightKg: bodyweightKg,
+          gender: gender,
+        ),
+      );
+      final dto = envelope.data;
+      await _userDao.upsertUser(_dtoToCompanion(dto));
+      final row = await _userDao.getUser(dto.id);
+      if (row == null) throw Exception('Profile not found after save');
+      return _rowToProfile(row);
+    } catch (e) {
+      debugPrint('ProfileRepository: competition update server sync failed: $e');
+      await enqueueSyncItem(
+        dao: _syncDao,
+        userId: _userId,
+        entityTable: 'users',
+        recordId: _userId,
+        operation: data.SyncOperation.update,
+        payload: {
+          if (federation != null) 'federation': federation,
+          if (division != null) 'division': division,
+          if (weightClassKg != null) 'weightClassKg': weightClassKg,
+          if (bodyweightKg != null) 'bodyweightKg': bodyweightKg,
+          if (gender != null) 'gender': gender,
+        },
+      );
+      final row = await _userDao.getUser(_userId);
+      if (row == null) throw Exception('Profile not found in local DB');
+      return _rowToProfile(row);
+    }
+  }
+
+  @override
   Future<UserPreferences> updatePreferences(
     String userId,
     UserPreferences prefs,
@@ -100,6 +165,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
             displayName: Value(currentRow.displayName),
             avatarUrl: Value(currentRow.avatarUrl),
             bio: Value(currentRow.bio),
+            federation: Value(currentRow.federation),
+            division: Value(currentRow.division),
+            weightClassKg: Value(currentRow.weightClassKg),
+            bodyweightKg: Value(currentRow.bodyweightKg),
+            gender: Value(currentRow.gender),
             authProvider: Value(currentRow.authProvider),
             isGuest: Value(currentRow.isGuest),
             preferences: Value(_preferencesMapFromDomain(updated)),
@@ -156,12 +226,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return UserProfile(
       id: row.id,
       email: row.email.startsWith('guest:') ? null : row.email,
-      // Issue #20: The Drift column is non-nullable so we store '' when the
-      // server sends null. Convert '' back to null here so callers see a
-      // proper absent value and fallback labels work correctly.
-      displayName: row.displayName.isEmpty ? null : row.displayName,
+      displayName: row.displayName,
       avatarUrl: row.avatarUrl,
       bio: row.bio,
+      federation: row.federation,
+      division: row.division,
+      weightClassKg: row.weightClassKg,
+      bodyweightKg: row.bodyweightKg,
+      gender: row.gender,
       authProvider: _convertAuthProvider(row.authProvider),
       isGuest: row.isGuest,
       preferences: _mapToPreferences(prefsMap),
@@ -174,11 +246,14 @@ class ProfileRepositoryImpl implements ProfileRepository {
     return data.UsersCompanion(
       id: Value(dto.id),
       email: Value(dto.email ?? 'guest:${dto.id}'),
-      // Store '' when null because Drift column is non-nullable.
-      // _rowToProfile converts '' back to null on read.
-      displayName: Value(dto.displayName ?? ''),
+      displayName: Value(dto.displayName),
       avatarUrl: Value(dto.avatarUrl),
       bio: Value(dto.bio),
+      federation: Value(dto.federation),
+      division: Value(dto.division),
+      weightClassKg: Value(dto.weightClassKg),
+      bodyweightKg: Value(dto.bodyweightKg),
+      gender: Value(dto.gender),
       authProvider: Value(_convertDtoAuthProvider(dto.authProvider)),
       isGuest: Value(dto.isGuest),
       preferences: Value(_preferencesFromDto(dto.preferences)),

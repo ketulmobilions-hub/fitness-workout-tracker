@@ -61,6 +61,11 @@ model User {
   displayName  String?      @map("display_name")
   avatarUrl    String?      @map("avatar_url")
   bio          String?      @db.Text
+  federation     String?
+  division       String?
+  weightClassKg  Float?       @map("weight_class_kg")
+  bodyweightKg   Float?       @map("bodyweight_kg")
+  gender         String?
   authProvider   AuthProvider @default(email) @map("auth_provider")
   providerUserId String?      @unique @map("provider_user_id")
   isGuest        Boolean      @default(false) @map("is_guest")

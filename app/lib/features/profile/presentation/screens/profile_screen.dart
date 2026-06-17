@@ -204,6 +204,33 @@ class ProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                 ],
 
+                // -- Competition profile chips
+                if (!isGuest &&
+                    (profile.federation != null ||
+                        profile.weightClassKg != null)) ...[
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (profile.federation != null)
+                        Chip(
+                          avatar: const Icon(Icons.emoji_events_outlined,
+                              size: 16),
+                          label: Text(profile.federation!),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      if (profile.weightClassKg != null)
+                        Chip(
+                          avatar: const Icon(Icons.fitness_center, size: 16),
+                          label: Text(
+                            '${profile.weightClassKg!.toStringAsFixed(profile.weightClassKg! % 1 == 0 ? 0 : 1)}kg',
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // -- Actions
                 if (!isGuest)
                   OutlinedButton.icon(
@@ -211,6 +238,15 @@ class ProfileScreen extends ConsumerWidget {
                     label: const Text('Edit Profile'),
                     onPressed: () => context.push(AppRoutes.editProfile),
                   ),
+                if (!isGuest) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.emoji_events_outlined),
+                    label: const Text('Competition Profile'),
+                    onPressed: () =>
+                        context.push(AppRoutes.competitionProfile),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.settings_outlined),

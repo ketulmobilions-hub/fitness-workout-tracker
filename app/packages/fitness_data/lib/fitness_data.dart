@@ -22,6 +22,8 @@ export 'src/remote/streak_api_client.dart';
 export 'src/remote/dtos/streak_dtos.dart';
 export 'src/remote/sync_api_client.dart';
 export 'src/remote/dtos/sync_dtos.dart';
+export 'src/remote/reference_api_client.dart';
+export 'src/remote/dtos/reference_dtos.dart';
 
 // Local database
 export 'src/local/app_database.dart';

@@ -27,6 +27,19 @@ const updateProfileBody = z
     message: 'At least one field must be provided',
   });
 
+const updateCompetitionProfileBody = z
+  .object({
+    // null clears the field; undefined (key absent) = no change
+    federation: z.enum(['IPF', 'USAPL', 'CPU', 'RPS', 'WRPF']).nullable().optional(),
+    division: z.string().min(1).max(100).nullable().optional(),
+    weightClassKg: z.number().positive().max(200).nullable().optional(),
+    bodyweightKg: z.number().positive().max(500).nullable().optional(),
+    gender: z.enum(['M', 'F', 'Mx']).nullable().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0 && Object.values(data).some((v) => v !== undefined), {
+    message: 'At least one field must be provided',
+  });
+
 const updatePreferencesBody = z
   .object({
     units: z.enum(['metric', 'imperial']).optional(),
@@ -60,6 +73,15 @@ router.patch(
   profileUpdateLimiter,
   validate({ body: updateProfileBody }),
   user.updateProfile,
+);
+
+router.patch(
+  '/me/competition',
+  authenticate,
+  requireFullAccount,
+  profileUpdateLimiter,
+  validate({ body: updateCompetitionProfileBody }),
+  user.updateCompetitionProfile,
 );
 
 router.patch(

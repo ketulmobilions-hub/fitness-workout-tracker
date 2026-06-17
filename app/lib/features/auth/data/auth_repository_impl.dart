@@ -217,7 +217,7 @@ class AuthRepositoryImpl implements AuthRepository {
       UsersCompanion.insert(
         id: dto.id,
         email: effectiveEmail,
-        displayName: displayName,
+        displayName: Value(displayName),
         authProvider: provider,
         isGuest: Value(isGuest),
       ),
