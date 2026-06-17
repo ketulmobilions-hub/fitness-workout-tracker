@@ -140,6 +140,7 @@ export const updatePreferences = async (_req: Request, res: Response): Promise<v
   const body = res.locals.validated!.body as {
     units?: 'metric' | 'imperial';
     theme?: 'light' | 'dark' | 'system';
+    scoreSystem?: 'wilks' | 'dots' | 'ipfGl';
     notifications?: {
       workoutReminders?: boolean;
       streakAlerts?: boolean;

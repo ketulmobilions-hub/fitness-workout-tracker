@@ -11,5 +11,9 @@ abstract class ProgressOverview with _$ProgressOverview {
     required int currentStreak,
     required int longestStreak,
     String? lastWorkoutDate,
+    // Strength scores — null when bodyweight/gender not set or no SBD PRs.
+    double? wilks,
+    double? dots,
+    double? ipfGl,
   }) = _ProgressOverview;
 }

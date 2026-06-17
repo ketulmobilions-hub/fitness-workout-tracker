@@ -1,15 +1,36 @@
 import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/utils/one_rm_utils.dart';
-
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/utils/one_rm_utils.dart';
+import '../../../profile/providers/profile_providers.dart';
+import '../../../progress/providers/progress_providers.dart';
 import '../../providers/active_session_notifier.dart';
+
+// Exercise name fragments that disqualify a lift from counting as a main SBD
+// movement — mirrors the server-side ILIKE exclusions in progress.controller.ts.
+const _kSbdExclusions = [
+  'hack squat', 'belt squat', 'romanian', 'stiff', 'trap bar',
+];
+
+// Returns true when the session set a max_weight PR on a competition squat,
+// bench press, or deadlift (excluding accessories that share the name fragment).
+bool _sessionHasSbdPr(WorkoutSummary summary) {
+  return summary.newPRs.any((pr) {
+    if (pr.recordType != 'max_weight') return false;
+    final name = pr.exerciseName.toLowerCase();
+    if (_kSbdExclusions.any((e) => name.contains(e))) return false;
+    return name.contains('squat') ||
+        name.contains('bench press') ||
+        name.contains('deadlift');
+  });
+}
 
 /// Displayed after a session is successfully completed.
 /// Receives a [WorkoutSummary] via GoRouter [extra].
-class WorkoutSummaryScreen extends StatelessWidget {
+class WorkoutSummaryScreen extends ConsumerWidget {
   const WorkoutSummaryScreen({super.key, required this.summary});
 
   final WorkoutSummary summary;
@@ -22,11 +43,25 @@ class WorkoutSummaryScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final exercisesWithSets =
         summary.exerciseData.where((e) => e.loggedSets.isNotEmpty).toList();
     final bestOneRm = bestSessionOneRepMax(summary);
+
+    // Only show updated strength score when this session set a SBD max_weight PR.
+    // Trigger a fresh overview fetch so the score reflects the new PR.
+    final showScore = _sessionHasSbdPr(summary);
+    final overviewAsync = showScore ? ref.watch(progressOverviewProvider) : null;
+    final scoreSystem = ref.watch(profileStreamProvider).value?.preferences.scoreSystem ?? ScoreSystem.dots;
+    final overview = overviewAsync?.value;
+    final updatedScore = overview == null
+        ? null
+        : switch (scoreSystem) {
+            ScoreSystem.wilks => overview.wilks,
+            ScoreSystem.dots => overview.dots,
+            ScoreSystem.ipfGl => overview.ipfGl,
+          };
 
     return Scaffold(
       appBar: AppBar(
@@ -144,6 +179,49 @@ class WorkoutSummaryScreen extends StatelessWidget {
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Strength score update ────────────────────────────────────────
+          if (updatedScore != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 14,
+                    horizontal: 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.leaderboard_outlined,
+                        color: theme.colorScheme.onTertiaryContainer,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Updated ${switch (scoreSystem) { ScoreSystem.wilks => 'Wilks', ScoreSystem.dots => 'Dots', ScoreSystem.ipfGl => 'IPF GL' }}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onTertiaryContainer,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        updatedScore.toStringAsFixed(1),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.onTertiaryContainer,
                         ),
                       ),
                     ],

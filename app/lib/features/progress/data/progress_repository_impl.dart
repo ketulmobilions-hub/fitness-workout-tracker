@@ -44,6 +44,9 @@ class ProgressRepositoryImpl implements ProgressRepository {
         currentStreak: dto.currentStreak,
         longestStreak: dto.longestStreak,
         lastWorkoutDate: dto.lastWorkoutDate,
+        wilks: dto.wilks,
+        dots: dto.dots,
+        ipfGl: dto.ipfGl,
       );
     } catch (e) {
       _mapError(e);

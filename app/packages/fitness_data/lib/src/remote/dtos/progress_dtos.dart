@@ -16,6 +16,9 @@ abstract class ProgressOverviewDto with _$ProgressOverviewDto {
     required int currentStreak,
     required int longestStreak,
     String? lastWorkoutDate,
+    @Default(null) double? wilks,
+    @Default(null) double? dots,
+    @Default(null) double? ipfGl,
   }) = _ProgressOverviewDto;
 
   factory ProgressOverviewDto.fromJson(Map<String, dynamic> json) =>
