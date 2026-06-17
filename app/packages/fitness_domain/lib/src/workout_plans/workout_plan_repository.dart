@@ -1,5 +1,6 @@
 import 'schedule_type.dart';
 import 'workout_plan.dart';
+import 'workout_plan_template.dart';
 
 abstract class WorkoutPlanRepository {
   /// Stream of the current user's plans (metadata only — no days/exercises).
@@ -104,5 +105,26 @@ abstract class WorkoutPlanRepository {
     required String planId,
     required String planDayId,
     required List<String> orderedExerciseIds,
+  });
+
+  // -------------------------------------------------------------------------
+  // Templates
+  // -------------------------------------------------------------------------
+
+  /// Fetches the list of all powerlifting program templates.
+  Future<List<ProgramTemplateSummary>> listTemplates({String? category});
+
+  /// Fetches a single template with full week/day/exercise detail.
+  Future<ProgramTemplate> getTemplate(String templateId);
+
+  /// Imports a template as a new user plan. Optionally accepts the user's
+  /// current 1RM maxes to seed personal records.
+  Future<TemplateImportResult> importTemplate({
+    required String templateId,
+    String? name,
+    double? squatMax,
+    double? benchMax,
+    double? deadliftMax,
+    double? ohpMax,
   });
 }

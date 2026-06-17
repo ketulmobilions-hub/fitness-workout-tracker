@@ -3,6 +3,7 @@ import 'package:retrofit/retrofit.dart';
 
 import 'dtos/plan_dtos.dart';
 import 'dtos/plan_request_dtos.dart';
+import 'dtos/template_dtos.dart';
 
 part 'plan_api_client.g.dart';
 
@@ -67,5 +68,25 @@ abstract class PlanApiClient {
   Future<void> reorderExercises(
     @Path('id') String planId,
     @Body() ReorderPlanExercisesRequestDto body,
+  );
+
+  // -------------------------------------------------------------------------
+  // Templates
+  // -------------------------------------------------------------------------
+
+  @GET('/api/v1/plans/templates')
+  Future<TemplateListEnvelopeDto> listTemplates({
+    @Query('category') String? category,
+  });
+
+  @GET('/api/v1/plans/templates/{templateId}')
+  Future<TemplateDetailEnvelopeDto> getTemplate(
+    @Path('templateId') String templateId,
+  );
+
+  @POST('/api/v1/plans/templates/{templateId}/import')
+  Future<PlanDetailEnvelopeDto> importTemplate(
+    @Path('templateId') String templateId,
+    @Body() ImportTemplateRequestDto body,
   );
 }

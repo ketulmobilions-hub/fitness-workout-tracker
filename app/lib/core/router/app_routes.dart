@@ -21,6 +21,16 @@ abstract final class AppRoutes {
   // Workout plan routes
   static const plans = '/plans';
 
+  // Template routes — registered before /plans/create and /plans/:planId so
+  // GoRouter does not match "templates" as a planId.
+  static const planTemplates = '/plans/templates';
+  static const planTemplateDetail = '/plans/templates/:templateId';
+
+  /// Returns the concrete path for navigating to a specific template detail
+  /// screen, e.g. `/plans/templates/531-bbb`.
+  static String planTemplateDetailPath(String id) =>
+      '/plans/templates/$id';
+
   /// Static route — must be registered BEFORE [planDetail] so GoRouter does
   /// not match the literal string "create" as a planId.
   static const createPlan = '/plans/create';

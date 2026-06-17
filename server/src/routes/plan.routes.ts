@@ -88,11 +88,12 @@ const targetRepsSchema = z
   .regex(/^\d+(-\d+)?$/, 'targetReps must be a number or range (e.g. "10" or "8-12")')
   .optional();
 
-// Validates a % of 1RM value: decimal fraction 0.5–1.0 in 2.5% (0.025) increments.
+// Validates a % of 1RM value: decimal fraction 0.25–1.0 in 2.5% (0.025) increments.
+// Lower bound is 0.25 (not 0.5) to accommodate deload and warmup-ramp sets.
 // v * 40 must be an integer (since 1/40 = 0.025). Epsilon guard for float representation.
 const targetWeightPct1rmSchema = z
   .number()
-  .min(0.5)
+  .min(0.25)
   .max(1.0)
   .refine((v) => Math.abs(Math.round(v * 40) - v * 40) < 1e-9, {
     message: 'Must be a multiple of 2.5% (0.025)',
@@ -142,7 +143,33 @@ const reorderBodySchema = z.object({
   planDayExerciseIds: z.array(z.string().uuid()).min(1).max(100),
 });
 
+const templateParamsSchema = z.object({
+  templateId: z.string().regex(/^[a-z0-9-]+$/).max(50),
+});
+
+const listTemplatesQuerySchema = z.object({
+  category: z.enum(['powerlifting']).optional(),
+});
+
+const importTemplateBodySchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  squatMax: z.number().positive().max(1000).optional(),
+  benchMax: z.number().positive().max(1000).optional(),
+  deadliftMax: z.number().positive().max(1000).optional(),
+  ohpMax: z.number().positive().max(1000).optional(),
+  activate: z.boolean().optional(),
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
+
+// Template routes — registered before /:id so 'templates' isn't parsed as a planId
+router.get('/templates', validate({ query: listTemplatesQuerySchema }), plan.listTemplates);
+router.get('/templates/:templateId', validate({ params: templateParamsSchema }), plan.getTemplate);
+router.post(
+  '/templates/:templateId/import',
+  validate({ params: templateParamsSchema, body: importTemplateBodySchema }),
+  plan.importTemplate,
+);
 
 // Plan CRUD
 router.post('/', validate({ body: createPlanBodySchema }), plan.createPlan);

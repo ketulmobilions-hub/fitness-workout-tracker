@@ -20,6 +20,8 @@ import '../../features/profile/presentation/screens/settings_screen.dart';
 import '../../features/progress/progress.dart';
 import '../../features/streak/presentation/screens/streak_detail_screen.dart';
 import '../../features/workout_history/workout_history.dart';
+import '../../features/workout_plans/presentation/screens/template_detail_screen.dart';
+import '../../features/workout_plans/presentation/screens/template_list_screen.dart';
 import '../../features/workout_plans/workout_plans.dart';
 import '../navigation/app_shell.dart';
 import 'app_routes.dart';
@@ -197,6 +199,20 @@ GoRouter appRouter(Ref ref) {
       ),
 
       // Workout plans (detail / create / edit — full-screen, no bottom nav)
+      // Template routes must come BEFORE create/detail routes so GoRouter
+      // does not match "templates" as a planId.
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.planTemplates,
+        builder: (context, state) => const TemplateListScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.planTemplateDetail,
+        builder: (context, state) => TemplateDetailScreen(
+          templateId: state.pathParameters['templateId']!,
+        ),
+      ),
       // Static route must come BEFORE the parameterized sibling so GoRouter
       // does not match the literal string "create" as a planId.
       GoRoute(
