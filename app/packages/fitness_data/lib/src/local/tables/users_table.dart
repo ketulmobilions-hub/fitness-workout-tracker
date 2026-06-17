@@ -8,9 +8,14 @@ class Users extends Table {
   TextColumn get id => text()();
   TextColumn get email => text().unique()();
   TextColumn get passwordHash => text().nullable()();
-  TextColumn get displayName => text()();
+  TextColumn get displayName => text().nullable()();
   TextColumn get avatarUrl => text().nullable()();
   TextColumn get bio => text().nullable()();
+  TextColumn get federation => text().nullable()();
+  TextColumn get division => text().nullable()();
+  RealColumn get weightClassKg => real().nullable()();
+  RealColumn get bodyweightKg => real().nullable()();
+  TextColumn get gender => text().nullable()();
   TextColumn get authProvider =>
       text().map(const AuthProviderConverter())();
   BoolColumn get isGuest =>

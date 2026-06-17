@@ -61,7 +61,7 @@ String _fakeJwt(String sub, {bool isGuest = false}) {
 Future<AppDatabase> _makeSeededDb({
   required String id,
   required String email,
-  required String displayName,
+  String? displayName,
   AuthProvider provider = AuthProvider.emailPassword,
   bool isGuest = false,
 }) async {
@@ -70,7 +70,7 @@ Future<AppDatabase> _makeSeededDb({
     UsersCompanion.insert(
       id: id,
       email: email,
-      displayName: displayName,
+      displayName: Value(displayName),
       authProvider: provider,
       isGuest: Value(isGuest),
     ),

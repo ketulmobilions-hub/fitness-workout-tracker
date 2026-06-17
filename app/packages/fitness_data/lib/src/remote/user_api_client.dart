@@ -17,6 +17,11 @@ abstract class UserApiClient {
     @Body() UpdateProfileRequestDto body,
   );
 
+  @PATCH('/users/me/competition')
+  Future<ProfileEnvelopeDto> updateCompetitionProfile(
+    @Body() UpdateCompetitionProfileRequestDto body,
+  );
+
   @PATCH('/users/me/preferences')
   Future<PreferencesEnvelopeDto> updatePreferences(
     @Body() UpdatePreferencesRequestDto body,

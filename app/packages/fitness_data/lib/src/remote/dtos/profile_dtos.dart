@@ -39,6 +39,11 @@ abstract class ProfileResponseDto with _$ProfileResponseDto {
     String? displayName,
     String? avatarUrl,
     String? bio,
+    @Default(null) String? federation,
+    @Default(null) String? division,
+    @Default(null) double? weightClassKg,
+    @Default(null) double? bodyweightKg,
+    @Default(null) String? gender,
     required String authProvider,
     required bool isGuest,
     required UserPreferencesDto preferences,
@@ -109,6 +114,24 @@ abstract class UpdateProfileRequestDto with _$UpdateProfileRequestDto {
 
   factory UpdateProfileRequestDto.fromJson(Map<String, dynamic> json) =>
       _$UpdateProfileRequestDtoFromJson(json);
+}
+
+@freezed
+abstract class UpdateCompetitionProfileRequestDto
+    with _$UpdateCompetitionProfileRequestDto {
+  const factory UpdateCompetitionProfileRequestDto({
+    // Null values are intentionally included in JSON to allow clearing fields.
+    // Server interprets null as "clear this field".
+    String? federation,
+    String? division,
+    double? weightClassKg,
+    double? bodyweightKg,
+    String? gender,
+  }) = _UpdateCompetitionProfileRequestDto;
+
+  factory UpdateCompetitionProfileRequestDto.fromJson(
+          Map<String, dynamic> json) =>
+      _$UpdateCompetitionProfileRequestDtoFromJson(json);
 }
 
 @freezed

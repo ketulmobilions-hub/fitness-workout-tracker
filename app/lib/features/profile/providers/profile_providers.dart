@@ -8,6 +8,7 @@ import '../../../core/providers/dio_provider.dart';
 import '../../workout_plans/providers/workout_plan_providers.dart';
 import '../data/profile_repository_impl.dart';
 
+
 part 'profile_providers.g.dart';
 
 // Issue #17: keepAlive: true prevents profileRepositoryProvider (also keepAlive)
@@ -20,12 +21,29 @@ data.UserApiClient userApiClient(Ref ref) {
 }
 
 @Riverpod(keepAlive: true)
+data.ReferenceApiClient referenceApiClient(Ref ref) {
+  return data.ReferenceApiClient(ref.watch(dioProvider));
+}
+
+@Riverpod(keepAlive: true)
 ProfileRepository profileRepository(Ref ref) {
+  final userId = ref.watch(stableUserIdProvider) ?? '';
   return ProfileRepositoryImpl(
     apiClient: ref.watch(userApiClientProvider),
     userDao: ref.watch(appDatabaseProvider).userDao,
+    syncQueueDao: ref.watch(appDatabaseProvider).syncQueueDao,
+    userId: userId,
     clearTokens: () => ref.read(authTokenProvider.notifier).clearTokens(),
   );
+}
+
+/// Caches static weight-class reference data for the session.
+/// Fetched once — the data is hardcoded on the server and never changes.
+@Riverpod(keepAlive: true)
+Future<Map<String, dynamic>> weightClasses(Ref ref) async {
+  final client = ref.watch(referenceApiClientProvider);
+  final envelope = await client.getWeightClasses();
+  return envelope.data['weightClasses'] as Map<String, dynamic>? ?? {};
 }
 
 /// Tracks the error (if any) from the most recent background profile refresh.

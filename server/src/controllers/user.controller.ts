@@ -18,6 +18,11 @@ type UserRow = {
   displayName: string | null;
   avatarUrl: string | null;
   bio: string | null;
+  federation: string | null;
+  division: string | null;
+  weightClassKg: number | null;
+  bodyweightKg: number | null;
+  gender: string | null;
   authProvider: string;
   isGuest: boolean;
   preferences: Prisma.JsonValue;
@@ -32,6 +37,11 @@ function mapUser(user: UserRow): Record<string, unknown> {
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
     bio: user.bio,
+    federation: user.federation,
+    division: user.division,
+    weightClassKg: user.weightClassKg,
+    bodyweightKg: user.bodyweightKg,
+    gender: user.gender,
     authProvider: user.authProvider,
     isGuest: user.isGuest,
     preferences: user.preferences ?? {},
@@ -46,6 +56,11 @@ const USER_SELECT = {
   displayName: true,
   avatarUrl: true,
   bio: true,
+  federation: true,
+  division: true,
+  weightClassKg: true,
+  bodyweightKg: true,
+  gender: true,
   authProvider: true,
   isGuest: true,
   preferences: true,
@@ -59,7 +74,7 @@ export const getProfile = async (_req: Request, res: Response): Promise<void> =>
   const user = await prisma.user.findUnique({ where: { id: userId }, select: USER_SELECT });
   if (!user) throw new AppError(404, 'User not found');
 
-  sendSuccess(res, { user: mapUser(user) });
+  sendSuccess(res, mapUser(user));
 };
 
 export const updateProfile = async (_req: Request, res: Response): Promise<void> => {
@@ -80,7 +95,38 @@ export const updateProfile = async (_req: Request, res: Response): Promise<void>
       },
       select: USER_SELECT,
     });
-    sendSuccess(res, { user: mapUser(user) });
+    sendSuccess(res, mapUser(user));
+  } catch (err: unknown) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw new AppError(404, 'User not found');
+    }
+    throw err;
+  }
+};
+
+export const updateCompetitionProfile = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+  const body = res.locals.validated!.body as {
+    federation?: string | null;
+    division?: string | null;
+    weightClassKg?: number | null;
+    bodyweightKg?: number | null;
+    gender?: string | null;
+  };
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(body.federation !== undefined && { federation: body.federation }),
+        ...(body.division !== undefined && { division: body.division }),
+        ...(body.weightClassKg !== undefined && { weightClassKg: body.weightClassKg }),
+        ...(body.bodyweightKg !== undefined && { bodyweightKg: body.bodyweightKg }),
+        ...(body.gender !== undefined && { gender: body.gender }),
+      },
+      select: USER_SELECT,
+    });
+    sendSuccess(res, mapUser(user));
   } catch (err: unknown) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'User not found');

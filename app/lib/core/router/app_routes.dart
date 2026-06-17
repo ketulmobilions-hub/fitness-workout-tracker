@@ -67,6 +67,7 @@ abstract final class AppRoutes {
   // Profile routes
   static const profile = '/profile';
   static const editProfile = '/profile/edit';
+  static const competitionProfile = '/profile/competition';
   static const settings = '/settings';
 
   /// Returns the concrete path for navigating to an exercise progress screen,

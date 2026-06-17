@@ -16,6 +16,15 @@ abstract interface class ProfileRepository {
     String? bio,
   });
 
+  /// Updates athlete competition profile. At least one must be non-null.
+  Future<UserProfile> updateCompetitionProfile({
+    String? federation,
+    String? division,
+    double? weightClassKg,
+    double? bodyweightKg,
+    String? gender,
+  });
+
   /// Merges preference changes to the server and updates local cache for [userId].
   Future<UserPreferences> updatePreferences(
       String userId, UserPreferences prefs);

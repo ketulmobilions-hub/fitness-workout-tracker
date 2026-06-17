@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -131,6 +131,31 @@ class AppDatabase extends _$AppDatabase {
           // Add is_deload to plan_days to tag deload weeks from template imports.
           // Defaults to false for all pre-existing rows.
           await m.addColumn(planDays, planDays.isDeload);
+        }
+        if (from < 7) {
+          // Add competition profile columns to users.
+          // Nullable — existing rows stay null until the user fills them in.
+          await m.addColumn(users, users.federation);
+          await m.addColumn(users, users.division);
+          await m.addColumn(users, users.weightClassKg);
+          await m.addColumn(users, users.bodyweightKg);
+          await m.addColumn(users, users.gender);
+        }
+        if (from < 8) {
+          // Make displayName nullable to match the server schema.
+          // Drift requires a full TableMigration (table recreate + copy)
+          // to change column nullability in SQLite.
+          // Existing '' sentinel values become NULL after recreation —
+          // the _rowToProfile sentinel check is removed in the same commit.
+          await m.alterTable(TableMigration(
+            users,
+            columnTransformer: {
+              // Map '' → NULL so pre-existing sentinel rows become proper nulls.
+              users.displayName: const CustomExpression(
+                "CASE WHEN display_name = '' THEN NULL ELSE display_name END",
+              ),
+            },
+          ));
         }
       },
     );
