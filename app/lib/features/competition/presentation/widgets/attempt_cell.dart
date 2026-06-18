@@ -7,6 +7,99 @@ typedef AttemptSaveCallback = Future<void> Function(
   String result,
 );
 
+/// Read-only visual display of a single attempt's result.
+/// Shared between [AttemptCell] (animated, tappable) and the
+/// read-only competition detail screen.
+class AttemptResultDisplay extends StatelessWidget {
+  const AttemptResultDisplay({
+    super.key,
+    required this.attempt,
+    this.height = 60,
+    this.animated = false,
+  });
+
+  final CompetitionAttempt? attempt;
+  final double height;
+
+  /// When true, wraps in [AnimatedContainer] so result color changes animate.
+  final bool animated;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    Color borderColor;
+    Color bgColor;
+    Widget content;
+
+    if (attempt == null || attempt!.result == AttemptResult.notTaken) {
+      borderColor = cs.outlineVariant;
+      bgColor = cs.surfaceContainerHighest;
+      content = Text(
+        attempt != null ? '${attempt!.weightKg.toStringAsFixed(1)} kg' : '—',
+        style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        textAlign: TextAlign.center,
+      );
+    } else if (attempt!.result == AttemptResult.goodLift) {
+      borderColor = Colors.green.shade400;
+      bgColor = Colors.green.withValues(alpha: 0.12);
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            attempt!.weightKg.toStringAsFixed(1),
+            style: tt.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: Colors.green.shade700,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const Icon(Icons.check_circle, size: 14, color: Colors.green),
+        ],
+      );
+    } else {
+      // no_lift
+      borderColor = cs.error;
+      bgColor = cs.errorContainer.withValues(alpha: 0.4);
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            attempt!.weightKg.toStringAsFixed(1),
+            style: tt.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: cs.error,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          Icon(Icons.cancel, size: 14, color: cs.error),
+        ],
+      );
+    }
+
+    final decoration = BoxDecoration(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: borderColor, width: 1.5),
+    );
+
+    if (animated) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: height,
+        decoration: decoration,
+        child: Center(child: content),
+      );
+    }
+    return Container(
+      height: height,
+      decoration: decoration,
+      child: Center(child: content),
+    );
+  }
+}
+
 /// Displays a single attempt cell in the meet day grid.
 /// Tapping opens a bottom sheet to enter weight and record result.
 class AttemptCell extends StatelessWidget {
@@ -32,72 +125,9 @@ class AttemptCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final attempt = _attempt;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    Color borderColor;
-    Color bgColor;
-    Widget content;
-
-    if (attempt == null || attempt.result == AttemptResult.notTaken) {
-      // Empty / not yet attempted
-      borderColor = colorScheme.outlineVariant;
-      bgColor = colorScheme.surfaceContainerHighest;
-      content = Text(
-        attempt != null ? '${attempt.weightKg.toStringAsFixed(1)} kg' : '—',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-        textAlign: TextAlign.center,
-      );
-    } else if (attempt.result == AttemptResult.goodLift) {
-      borderColor = Colors.green.shade400;
-      bgColor = Colors.green.withValues(alpha: 0.12);
-      content = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${attempt.weightKg.toStringAsFixed(1)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: Colors.green.shade700,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const Icon(Icons.check_circle, size: 14, color: Colors.green),
-        ],
-      );
-    } else {
-      // no_lift
-      borderColor = colorScheme.error;
-      bgColor = colorScheme.errorContainer.withValues(alpha: 0.4);
-      content = Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${attempt.weightKg.toStringAsFixed(1)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.error,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          Icon(Icons.cancel, size: 14, color: colorScheme.error),
-        ],
-      );
-    }
-
     return GestureDetector(
       onTap: () => _showEntrySheet(context, attempt),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 60,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor, width: 1.5),
-        ),
-        child: Center(child: content),
-      ),
+      child: AttemptResultDisplay(attempt: attempt, animated: true),
     );
   }
 
@@ -175,7 +205,12 @@ class _AttemptEntrySheetState extends State<_AttemptEntrySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final ordinal = ['', '1st', '2nd', '3rd'][widget.attemptNumber];
+    final ordinal = switch (widget.attemptNumber) {
+      1 => '1st',
+      2 => '2nd',
+      3 => '3rd',
+      final n => '${n}th',
+    };
     // When editing an existing attempt, dim buttons that are not currently selected
     // so the coach can see at a glance which result is stored.
     final isExisting = widget.existing != null;

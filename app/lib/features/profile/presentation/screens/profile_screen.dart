@@ -247,6 +247,15 @@ class ProfileScreen extends ConsumerWidget {
                         context.push(AppRoutes.competitionProfile),
                   ),
                 ],
+                if (!isGuest) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.history),
+                    label: const Text('Competition History'),
+                    onPressed: () =>
+                        context.push(AppRoutes.competitionHistory),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.settings_outlined),

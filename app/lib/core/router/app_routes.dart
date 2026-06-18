@@ -65,8 +65,14 @@ abstract final class AppRoutes {
   static const exerciseProgress = '/progress/exercises/:exerciseId';
 
   // Competition routes
+  static const competitionHistory = '/competition/history';
   static const startMeet = '/competition/start';
   static const meetDay = '/competition/meet-day';
+
+  // Static segments must come BEFORE the parameterized sibling (:competitionId).
+  static const competitionDetail = '/competition/:competitionId';
+
+  static String competitionDetailPath(String id) => '/competition/$id';
 
   // Profile routes
   static const profile = '/profile';
