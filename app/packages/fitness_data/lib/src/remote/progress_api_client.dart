@@ -32,6 +32,9 @@ abstract class ProgressApiClient {
     @Query('granularity') String? granularity,
   });
 
+  @GET('/api/v1/progress/sbd-total')
+  Future<SbdTotalEnvelopeDto> getSbdTotal();
+
   @GET('/api/v1/progress/strength-scores/history')
   Future<ScoreHistoryEnvelopeDto> getStrengthScoreHistory();
 }

@@ -158,6 +158,34 @@ class StrengthScoreHistoryNotifier extends _$StrengthScoreHistoryNotifier {
 }
 
 // ---------------------------------------------------------------------------
+// SBD total — all-time bests + 12-month trend
+// ---------------------------------------------------------------------------
+
+@Riverpod(keepAlive: true)
+class SbdTotalNotifier extends _$SbdTotalNotifier {
+  @override
+  Future<SbdTotal> build() {
+    ref.listen(completedSessionsProvider, (previous, next) {
+      if ((previous is AsyncData || previous is AsyncError) &&
+          next is AsyncData) {
+        refresh();
+      }
+    });
+    return ref.watch(progressRepositoryProvider).fetchSbdTotal();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    try {
+      final data = await ref.read(progressRepositoryProvider).fetchSbdTotal();
+      state = AsyncValue.data(data);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Exercise progress — keyed by (exerciseId, period)
 // ---------------------------------------------------------------------------
 

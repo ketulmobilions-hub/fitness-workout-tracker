@@ -161,3 +161,19 @@ export const upgradeLimiter = rateLimit({
     message: 'Too many upgrade attempts, please try again later.',
   },
 });
+
+// For SBD total: tighter than the global limiter because this endpoint runs
+// 36+ correlated subqueries — more DB load than any other progress endpoint.
+// 10/window is invisible to legitimate users (the card loads once and refreshes
+// only on pull-to-refresh or after a completed session) while preventing a
+// client-side rapid-refresh bug from hammering the DB.
+export const sbdTotalLimiter = rateLimit({
+  ...baseOptions(makeStore('rl:sbd-total:')),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: 10,
+  message: {
+    status: 429,
+    error: 'Too Many Requests',
+    message: 'Too many requests, please try again later.',
+  },
+});
