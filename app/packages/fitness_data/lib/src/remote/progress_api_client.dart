@@ -37,4 +37,10 @@ abstract class ProgressApiClient {
 
   @GET('/api/v1/progress/strength-scores/history')
   Future<ScoreHistoryEnvelopeDto> getStrengthScoreHistory();
+
+  @GET('/api/v1/progress/volume-zones')
+  Future<VolumeZoneEnvelopeDto> getVolumeZones({
+    @Query('weeks') int? weeks,
+    @Query('utc_offset') required int utcOffset,
+  });
 }

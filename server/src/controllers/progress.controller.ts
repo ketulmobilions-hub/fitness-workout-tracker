@@ -8,6 +8,19 @@ import { computeAllScores } from '../utils/strengthScores.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type VolumeZoneRow = {
+  week_start: Date;
+  is_deload: boolean;
+  technique_sets: bigint;
+  technique_tonnage: string;
+  hypertrophy_sets: bigint;
+  hypertrophy_tonnage: string;
+  strength_sets: bigint;
+  strength_tonnage: string;
+  max_effort_sets: bigint;
+  max_effort_tonnage: string;
+};
+
 type OneRmHistoryRow = {
   session_date: Date | string;
   weight_kg: string;
@@ -631,6 +644,93 @@ export const getSbdTotal = async (_req: Request, res: Response): Promise<void> =
     monthly,
     monthOverMonthDelta,
     deltaVsMonth,
+  });
+};
+
+export const getVolumeZones = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+  const { weeks: weeksParam, utc_offset: utcOffset } = res.locals.validated!.query as {
+    weeks: number;
+    utc_offset: number;
+  };
+
+  // weeksParam is always a number — Zod default(12) guarantees it.
+  const start = new Date();
+  start.setDate(start.getDate() - weeksParam * 7);
+  start.setHours(0, 0, 0, 0);
+
+  // For each non-warmup set on a competition lift, compute intensity as:
+  //   weight_kg / GREATEST(rolling_max_weight_pr, epley_estimate_for_this_set)
+  // The GREATEST fallback avoids division-by-zero and handles athletes with no
+  // prior PRs logged (first session of a lift or fresh account).
+  // make_interval(mins => N) shifts completed_at to the user's local time so
+  // DATE_TRUNC('week') snaps to Monday 00:00 local instead of Monday 00:00 UTC.
+  const rows = await prisma.$queryRaw<VolumeZoneRow[]>`
+    WITH set_data AS (
+      SELECT
+        DATE_TRUNC('week', ws.completed_at + make_interval(mins => ${utcOffset}::int))
+          - make_interval(mins => ${utcOffset}::int) AS week_start,
+        COALESCE(pd.is_deload, false) AS is_deload,
+        sl.weight_kg,
+        sl.reps,
+        GREATEST(
+          COALESCE(
+            (
+              SELECT MAX(pr.value)
+              FROM personal_records pr
+              WHERE pr.user_id = ${userId}::uuid
+                AND pr.exercise_id = el.exercise_id
+                AND pr.record_type = 'max_weight'
+                AND pr.achieved_at <= ws.completed_at
+            ),
+            0
+          ),
+          sl.weight_kg * (1.0 + sl.reps::float / 30.0)
+        ) AS est_1rm
+      FROM workout_sessions ws
+      JOIN exercise_logs el ON el.session_id = ws.id
+      JOIN exercises e ON e.id = el.exercise_id AND e.is_competition_lift = true
+      JOIN set_logs sl ON sl.exercise_log_id = el.id
+      LEFT JOIN plan_days pd ON pd.id = ws.plan_day_id
+      WHERE ws.user_id = ${userId}::uuid
+        AND ws.status = 'completed'
+        AND ws.completed_at >= ${start}::timestamptz
+        AND sl.is_warmup = false
+        AND sl.weight_kg IS NOT NULL
+        AND sl.weight_kg > 0
+        AND sl.reps IS NOT NULL
+        AND sl.reps > 0
+    )
+    SELECT
+      week_start,
+      BOOL_OR(is_deload) AS is_deload,
+      COUNT(*) FILTER (WHERE weight_kg / est_1rm < 0.60) AS technique_sets,
+      COALESCE(SUM(weight_kg * reps) FILTER (WHERE weight_kg / est_1rm < 0.60), 0) AS technique_tonnage,
+      COUNT(*) FILTER (WHERE weight_kg / est_1rm >= 0.60 AND weight_kg / est_1rm < 0.75) AS hypertrophy_sets,
+      COALESCE(SUM(weight_kg * reps) FILTER (WHERE weight_kg / est_1rm >= 0.60 AND weight_kg / est_1rm < 0.75), 0) AS hypertrophy_tonnage,
+      COUNT(*) FILTER (WHERE weight_kg / est_1rm >= 0.75 AND weight_kg / est_1rm < 0.90) AS strength_sets,
+      COALESCE(SUM(weight_kg * reps) FILTER (WHERE weight_kg / est_1rm >= 0.75 AND weight_kg / est_1rm < 0.90), 0) AS strength_tonnage,
+      COUNT(*) FILTER (WHERE weight_kg / est_1rm >= 0.90) AS max_effort_sets,
+      COALESCE(SUM(weight_kg * reps) FILTER (WHERE weight_kg / est_1rm >= 0.90), 0) AS max_effort_tonnage
+    FROM set_data
+    GROUP BY week_start
+    ORDER BY week_start ASC
+  `;
+
+  sendSuccess(res, {
+    weeks: weeksParam,
+    data: rows.map((row) => ({
+      weekStart: toDateString(row.week_start),
+      isDeload: row.is_deload,
+      techniqueSets: Number(row.technique_sets),
+      techniqueTonnageKg: Math.round(Number(row.technique_tonnage) * 10) / 10,
+      hypertrophySets: Number(row.hypertrophy_sets),
+      hypertrophyTonnageKg: Math.round(Number(row.hypertrophy_tonnage) * 10) / 10,
+      strengthSets: Number(row.strength_sets),
+      strengthTonnageKg: Math.round(Number(row.strength_tonnage) * 10) / 10,
+      maxEffortSets: Number(row.max_effort_sets),
+      maxEffortTonnageKg: Math.round(Number(row.max_effort_tonnage) * 10) / 10,
+    })),
   });
 };
 

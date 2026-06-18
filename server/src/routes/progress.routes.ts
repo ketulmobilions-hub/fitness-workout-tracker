@@ -45,6 +45,11 @@ const volumeQuerySchema = z.object({
   granularity: z.enum(['daily', 'weekly', 'monthly']).optional(),
 });
 
+const volumeZonesQuerySchema = z.object({
+  weeks: z.coerce.number().int().min(1).max(52).default(12),
+  utc_offset: z.coerce.number().int().min(-720).max(840).default(0),
+});
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 router.get('/overview', validate({ query: overviewQuerySchema }), progress.getOverview);
@@ -62,5 +67,6 @@ router.get(
 );
 router.get('/personal-records', validate({ query: personalRecordsQuerySchema }), progress.getPersonalRecords);
 router.get('/volume', validate({ query: volumeQuerySchema }), progress.getVolume);
+router.get('/volume-zones', validate({ query: volumeZonesQuerySchema }), progress.getVolumeZones);
 
 export default router;

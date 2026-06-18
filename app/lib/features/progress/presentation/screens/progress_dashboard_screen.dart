@@ -73,6 +73,7 @@ class _ProgressDashboardScreenState
             ref.read(personalRecordsProvider.notifier).refresh(),
             ref.read(sbdTotalProvider.notifier).refresh(),
             ref.read(strengthScoreHistoryProvider.notifier).refresh(),
+            ref.read(volumeZoneProvider.notifier).refresh(),
             // ref.refresh atomically invalidates and returns the new future,
             // avoiding the separate invalidate + read(.future) race.
             ref.refresh(volumeDataProvider(volumeKey).future),
@@ -138,6 +139,11 @@ class _ProgressDashboardScreenState
                   ],
                 ),
               ),
+            ),
+
+            // Volume zone analysis — intensity distribution for competition lifts
+            const SliverToBoxAdapter(
+              child: _VolumeZoneCard(),
             ),
 
             // Strength balance ratios — collapsible, below main charts
@@ -1517,6 +1523,334 @@ class _VolumeChart extends StatelessWidget {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
     return '${monthAbbr[month]} $day';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Volume zone card — intensity zone breakdown for competition lifts
+// ---------------------------------------------------------------------------
+
+enum _ZoneViewMode { sets, tonnage }
+
+class _VolumeZoneCard extends ConsumerStatefulWidget {
+  const _VolumeZoneCard();
+
+  @override
+  ConsumerState<_VolumeZoneCard> createState() => _VolumeZoneCardState();
+}
+
+class _VolumeZoneCardState extends ConsumerState<_VolumeZoneCard> {
+  _ZoneViewMode _mode = _ZoneViewMode.sets;
+
+  static const _techniqueColor = Color(0xFF64B5F6);   // blue 300
+  static const _hypertrophyColor = Color(0xFF81C784); // green 300
+  static const _strengthColor = Color(0xFFFFB74D);    // orange 300
+  static const _maxEffortColor = Color(0xFFE57373);   // red 300
+
+  @override
+  Widget build(BuildContext context) {
+    final async = ref.watch(volumeZoneProvider);
+    return _SectionCard(
+      title: 'Intensity Zone Distribution',
+      child: async.when(
+        loading: () => const _SectionSkeleton(height: 200, label: 'Loading zones…'),
+        error: (e, _) => _ErrorTile(
+          message: 'Could not load zone data',
+          onRetry: () => ref.read(volumeZoneProvider.notifier).refresh(),
+        ),
+        data: (analysis) {
+          if (analysis.data.isEmpty) {
+            return const _ChartEmpty(
+              message:
+                  'No competition-lift data yet.\nLog squat, bench or deadlift sessions to see your intensity zones.',
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ZoneLegend(
+                mode: _mode,
+                onModeChanged: (m) => setState(() => _mode = m),
+              ),
+              const SizedBox(height: 12),
+              _ZoneChart(
+                weeks: analysis.data,
+                mode: _mode,
+                techniqueColor: _techniqueColor,
+                hypertrophyColor: _hypertrophyColor,
+                strengthColor: _strengthColor,
+                maxEffortColor: _maxEffortColor,
+              ),
+              const SizedBox(height: 12),
+              _ZoneSummary(weeks: analysis.data),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ZoneLegend extends StatelessWidget {
+  const _ZoneLegend({required this.mode, required this.onModeChanged});
+
+  final _ZoneViewMode mode;
+  final ValueChanged<_ZoneViewMode> onModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: const [
+              _LegendDot(color: Color(0xFF64B5F6), label: 'Technique'),
+              _LegendDot(color: Color(0xFF81C784), label: 'Hypertrophy'),
+              _LegendDot(color: Color(0xFFFFB74D), label: 'Strength'),
+              _LegendDot(color: Color(0xFFE57373), label: 'Max Effort'),
+            ],
+          ),
+        ),
+        SegmentedButton<_ZoneViewMode>(
+          segments: const [
+            ButtonSegment(value: _ZoneViewMode.sets, label: Text('Sets')),
+            ButtonSegment(value: _ZoneViewMode.tonnage, label: Text('Tonnage')),
+          ],
+          selected: {mode},
+          onSelectionChanged: (s) => onModeChanged(s.first),
+          style: SegmentedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            textStyle: const TextStyle(fontSize: 11),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .labelSmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
+}
+
+class _ZoneChart extends StatelessWidget {
+  const _ZoneChart({
+    required this.weeks,
+    required this.mode,
+    required this.techniqueColor,
+    required this.hypertrophyColor,
+    required this.strengthColor,
+    required this.maxEffortColor,
+  });
+
+  final List<VolumeZoneWeek> weeks;
+  final _ZoneViewMode mode;
+  final Color techniqueColor;
+  final Color hypertrophyColor;
+  final Color strengthColor;
+  final Color maxEffortColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isTonnage = mode == _ZoneViewMode.tonnage;
+
+    // Map from x-index to week for tooltips and labels — avoids positional
+    // index issues if weeks are filtered in the future.
+    final xToWeek = <int, VolumeZoneWeek>{};
+    final groups = <BarChartGroupData>[];
+
+    for (var i = 0; i < weeks.length; i++) {
+      final w = weeks[i];
+      xToWeek[i] = w;
+
+      final t = isTonnage ? w.techniqueTonnageKg : w.techniqueSets.toDouble();
+      final h = isTonnage ? w.hypertrophyTonnageKg : w.hypertrophySets.toDouble();
+      final s = isTonnage ? w.strengthTonnageKg : w.strengthSets.toDouble();
+      final m = isTonnage ? w.maxEffortTonnageKg : w.maxEffortSets.toDouble();
+      final total = t + h + s + m;
+
+      final opacity = w.isDeload ? 0.45 : 1.0;
+
+      groups.add(
+        BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: total,
+              width: weeks.length > 24 ? 6 : (weeks.length > 16 ? 10 : 14),
+              rodStackItems: [
+                BarChartRodStackItem(0, t, techniqueColor.withValues(alpha: opacity)),
+                BarChartRodStackItem(t, t + h, hypertrophyColor.withValues(alpha: opacity)),
+                BarChartRodStackItem(t + h, t + h + s, strengthColor.withValues(alpha: opacity)),
+                BarChartRodStackItem(t + h + s, total, maxEffortColor.withValues(alpha: opacity)),
+              ],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 200,
+      child: BarChart(
+        BarChartData(
+          barGroups: groups,
+          gridData: const FlGridData(show: false),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 28,
+                interval: 1,
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  final week = xToWeek[idx];
+                  if (week == null) return const SizedBox.shrink();
+
+                  // Show label only at start, middle, and end to avoid clutter.
+                  final total = weeks.length;
+                  final showLabel = idx == 0 ||
+                      idx == total - 1 ||
+                      (total > 4 && idx == (total / 2).round());
+                  if (!showLabel) return const SizedBox.shrink();
+
+                  final d = week.weekStart;
+                  const m = [
+                    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                  ];
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${m[d.month]} ${d.day}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final week = xToWeek[group.x];
+                if (week == null) return null;
+                final d = week.weekStart;
+                const mo = [
+                  '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                ];
+                final header = '${mo[d.month]} ${d.day}${week.isDeload ? ' (deload)' : ''}';
+                final suffix = isTonnage ? ' kg' : ' sets';
+                final t = isTonnage ? week.techniqueTonnageKg : week.techniqueSets.toDouble();
+                final h = isTonnage ? week.hypertrophyTonnageKg : week.hypertrophySets.toDouble();
+                final s = isTonnage ? week.strengthTonnageKg : week.strengthSets.toDouble();
+                final m = isTonnage ? week.maxEffortTonnageKg : week.maxEffortSets.toDouble();
+                return BarTooltipItem(
+                  '$header\n'
+                  'Technique: ${t.toStringAsFixed(isTonnage ? 1 : 0)}$suffix\n'
+                  'Hypertrophy: ${h.toStringAsFixed(isTonnage ? 1 : 0)}$suffix\n'
+                  'Strength: ${s.toStringAsFixed(isTonnage ? 1 : 0)}$suffix\n'
+                  'Max Effort: ${m.toStringAsFixed(isTonnage ? 1 : 0)}$suffix',
+                  TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ZoneSummary extends StatelessWidget {
+  const _ZoneSummary({required this.weeks});
+
+  final List<VolumeZoneWeek> weeks;
+
+  @override
+  Widget build(BuildContext context) {
+    // Aggregate across all non-deload weeks
+    int totTechnique = 0;
+    int totHypertrophy = 0;
+    int totStrength = 0;
+    int totMaxEffort = 0;
+
+    for (final w in weeks) {
+      if (w.isDeload) continue;
+      totTechnique += w.techniqueSets;
+      totHypertrophy += w.hypertrophySets;
+      totStrength += w.strengthSets;
+      totMaxEffort += w.maxEffortSets;
+    }
+
+    final total = totTechnique + totHypertrophy + totStrength + totMaxEffort;
+    if (total == 0) return const SizedBox.shrink();
+
+    final highPct = ((totStrength + totMaxEffort) / total * 100).round();
+    final dominantCount = [totTechnique, totHypertrophy, totStrength, totMaxEffort].reduce(
+      (a, b) => a > b ? a : b,
+    );
+    final dominantLabel = dominantCount == totTechnique
+        ? 'technique'
+        : dominantCount == totHypertrophy
+            ? 'hypertrophy'
+            : dominantCount == totStrength
+                ? 'strength'
+                : 'max-effort';
+
+    return Text(
+      '$highPct% of your sets are in the strength+ zone. '
+      'Most volume is concentrated in $dominantLabel work.',
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
   }
 }
 
