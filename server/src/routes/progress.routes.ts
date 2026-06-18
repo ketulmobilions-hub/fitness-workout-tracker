@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validate } from '../middleware/validate.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireFullAccount } from '../middleware/require-full-account.js';
+import { sbdTotalLimiter } from '../middleware/rate-limiter.js';
 import * as progress from '../controllers/progress.controller.js';
 
 const router = Router();
@@ -47,6 +48,7 @@ const volumeQuerySchema = z.object({
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 router.get('/overview', validate({ query: overviewQuerySchema }), progress.getOverview);
+router.get('/sbd-total', sbdTotalLimiter, progress.getSbdTotal);
 router.get('/strength-scores/history', progress.getStrengthScoreHistory);
 router.get(
   '/exercise/:id',

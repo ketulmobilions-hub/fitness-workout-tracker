@@ -157,6 +157,54 @@ abstract class PersonalRecordsEnvelopeDto with _$PersonalRecordsEnvelopeDto {
 }
 
 // ---------------------------------------------------------------------------
+// SBD total DTOs
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class SbdMonthPointDto with _$SbdMonthPointDto {
+  const factory SbdMonthPointDto({
+    required String month,
+    required double squat,
+    required double bench,
+    required double deadlift,
+  }) = _SbdMonthPointDto;
+
+  factory SbdMonthPointDto.fromJson(Map<String, dynamic> json) =>
+      _$SbdMonthPointDtoFromJson(json);
+}
+
+// Fix #7: nullable fields on a DTO don't need @Default(null) — Dart null safety
+// already defaults them to null. Removed to match the pattern used by other DTOs
+// in this file (e.g. ProgressOverviewDto.wilks).
+@freezed
+abstract class SbdTotalDto with _$SbdTotalDto {
+  const factory SbdTotalDto({
+    double? squat,
+    double? bench,
+    double? deadlift,
+    double? total,
+    @Default(0) int liftCount,
+    @Default([]) List<SbdMonthPointDto> monthly,
+    double? monthOverMonthDelta,
+    String? deltaVsMonth,
+  }) = _SbdTotalDto;
+
+  factory SbdTotalDto.fromJson(Map<String, dynamic> json) =>
+      _$SbdTotalDtoFromJson(json);
+}
+
+@freezed
+abstract class SbdTotalEnvelopeDto with _$SbdTotalEnvelopeDto {
+  const factory SbdTotalEnvelopeDto({
+    required int status,
+    required SbdTotalDto data,
+  }) = _SbdTotalEnvelopeDto;
+
+  factory SbdTotalEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$SbdTotalEnvelopeDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
 // Strength score history DTOs
 // ---------------------------------------------------------------------------
 

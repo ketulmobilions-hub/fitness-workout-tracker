@@ -1,6 +1,7 @@
 import 'exercise_progress.dart';
 import 'progress_overview.dart';
 import 'progress_personal_record.dart';
+import 'sbd_total.dart';
 import 'score_history.dart';
 import 'volume_data.dart';
 
@@ -39,4 +40,8 @@ abstract class ProgressRepository {
   /// Fetches the last 24 months of Wilks/Dots/IPF GL score history.
   /// Only months where all three SBD PRs exist are included.
   Future<ScoreHistory> fetchScoreHistory();
+
+  /// Fetches the user's all-time best SBD training total (squat + bench +
+  /// deadlift) plus a 12-month monthly trend.
+  Future<SbdTotal> fetchSbdTotal();
 }

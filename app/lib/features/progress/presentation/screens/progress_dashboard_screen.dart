@@ -71,6 +71,7 @@ class _ProgressDashboardScreenState
           await Future.wait([
             ref.read(progressOverviewProvider.notifier).refresh(),
             ref.read(personalRecordsProvider.notifier).refresh(),
+            ref.read(sbdTotalProvider.notifier).refresh(),
             ref.read(strengthScoreHistoryProvider.notifier).refresh(),
             // ref.refresh atomically invalidates and returns the new future,
             // avoiding the separate invalidate + read(.future) race.
@@ -92,6 +93,11 @@ class _ProgressDashboardScreenState
                 ),
                 data: (overview) => _OverviewSection(overview: overview),
               ),
+            ),
+
+            // SBD total card — shows all-time bests and 12-month trend.
+            const SliverToBoxAdapter(
+              child: _SbdTotalCard(),
             ),
 
             // Strength score card — only rendered when data is available.
@@ -394,6 +400,389 @@ class _StatTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SBD total card
+// ---------------------------------------------------------------------------
+
+class _SbdTotalCard extends ConsumerWidget {
+  const _SbdTotalCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sbdAsync = ref.watch(sbdTotalProvider);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return sbdAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('SBD Total',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                const _ChartSkeleton(),
+              ],
+            ),
+          ),
+        ),
+      ),
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('SBD Total',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                _ErrorTile(
+                  message: 'Could not load SBD total',
+                  onRetry: () =>
+                      ref.read(sbdTotalProvider.notifier).refresh(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      data: (sbd) {
+        // Need at least 1 lift logged to show anything useful.
+        if (sbd.liftCount == 0) return const SizedBox.shrink();
+
+        final delta = sbd.monthOverMonthDelta;
+        final hasTrend = sbd.monthly.length >= 2;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header row
+                  Row(
+                    children: [
+                      Icon(Icons.emoji_events_outlined,
+                          size: 20, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'SBD Total',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (delta != null) ...[
+                        const Spacer(),
+                        _DeltaChip(
+                          delta: delta,
+                          vsMonth: sbd.deltaVsMonth,
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Big total number
+                  if (sbd.total != null)
+                    Text(
+                      '${sbd.total!.toStringAsFixed(1)} kg',
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: cs.primary,
+                      ),
+                    )
+                  else
+                    Text(
+                      'Partial total',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+
+                  const SizedBox(height: 12),
+
+                  // Individual lift bests
+                  _LiftRow(
+                      label: 'Squat',
+                      value: sbd.squat,
+                      icon: Icons.fitness_center),
+                  _LiftRow(
+                      label: 'Bench',
+                      value: sbd.bench,
+                      icon: Icons.sports_gymnastics),
+                  _LiftRow(
+                      label: 'Deadlift',
+                      value: sbd.deadlift,
+                      icon: Icons.hardware),
+
+                  // Trend chart — only when ≥ 2 complete monthly points exist.
+                  if (hasTrend) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Monthly Trend',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _SbdTrendChart(monthly: sbd.monthly),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DeltaChip extends StatelessWidget {
+  const _DeltaChip({required this.delta, this.vsMonth});
+
+  final double delta;
+  final String? vsMonth; // 'YYYY-MM' — shown as "vs Jan" suffix
+
+  // Fix #6: delta == 0.0 was rendered as green "+0.0 kg" which falsely implies
+  // progress. Zero is neutral; negative is red; positive is green.
+  Color _color(ColorScheme cs) {
+    if (delta > 0) return Colors.green;
+    if (delta < 0) return cs.error;
+    return cs.onSurfaceVariant;
+  }
+
+  String get _sign {
+    if (delta > 0) return '+';
+    if (delta == 0.0) return '±';
+    return '';
+  }
+
+  // Format 'YYYY-MM' → 'Jan' for the "vs Jan" label.
+  String? _vsLabel() {
+    if (vsMonth == null) return null;
+    final parts = vsMonth!.split('-');
+    if (parts.length < 2) return null;
+    final m = int.tryParse(parts[1]);
+    if (m == null || m < 1 || m > 12) return null;
+    const abbr = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return abbr[m];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = _color(cs);
+    final label = _vsLabel();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label != null
+            ? '$_sign${delta.toStringAsFixed(1)} kg vs $label'
+            : '$_sign${delta.toStringAsFixed(1)} kg',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+    );
+  }
+}
+
+class _LiftRow extends StatelessWidget {
+  const _LiftRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final double? value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Text(label, style: theme.textTheme.bodyMedium),
+          const Spacer(),
+          Text(
+            value != null ? '${value!.toStringAsFixed(1)} kg' : '—',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: value != null ? cs.onSurface : cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SbdTrendChart extends StatelessWidget {
+  const _SbdTrendChart({required this.monthly});
+
+  final List<SbdMonthPoint> monthly;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    // Fix #8: SbdMonthPoint.total was removed from the domain model — compute
+    // here to avoid carrying derivable state that could be inconsistent.
+    double pointTotal(SbdMonthPoint p) => p.squat + p.bench + p.deadlift;
+
+    final spots = monthly
+        .asMap()
+        .entries
+        .map((e) => FlSpot(e.key.toDouble(), pointTotal(e.value)))
+        .toList();
+
+    final totals = monthly.map(pointTotal).toList();
+    final minTotal = totals.reduce((a, b) => a < b ? a : b);
+    final maxTotal = totals.reduce((a, b) => a > b ? a : b);
+    final chartMinY = (minTotal - 20).clamp(0.0, double.infinity);
+    final chartMaxY = maxTotal + 30;
+
+    return SizedBox(
+      height: 180,
+      child: LineChart(
+        LineChartData(
+          minY: chartMinY,
+          maxY: chartMaxY,
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.25,
+              color: cs.primary,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (_, _, _, _) => FlDotCirclePainter(
+                  radius: 3,
+                  color: cs.primary,
+                  strokeWidth: 0,
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: cs.primary.withValues(alpha: 0.08),
+              ),
+            ),
+          ],
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 48,
+                getTitlesWidget: (value, meta) {
+                  if (value == meta.max || value == meta.min) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    value.toInt().toString(),
+                    style:
+                        TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                  );
+                },
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 24,
+                interval: (spots.length / 4).ceilToDouble().clamp(1.0, 12.0),
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= monthly.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final parts = monthly[idx].month.split('-');
+                  if (parts.length < 2) return const SizedBox.shrink();
+                  final m = int.tryParse(parts[1]);
+                  if (m == null || m < 1 || m > 12) {
+                    return const SizedBox.shrink();
+                  }
+                  const abbr = [
+                    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                  ];
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      abbr[m],
+                      style: TextStyle(
+                          fontSize: 10, color: cs.onSurfaceVariant),
+                    ),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                final idx = spot.x.toInt();
+                if (idx < 0 || idx >= monthly.length) return null;
+                final p = monthly[idx];
+                final t = p.squat + p.bench + p.deadlift;
+                return LineTooltipItem(
+                  '${p.month}\n${t.toStringAsFixed(1)} kg total\n'
+                  'S ${p.squat.toStringAsFixed(1)} / '
+                  'B ${p.bench.toStringAsFixed(1)} / '
+                  'D ${p.deadlift.toStringAsFixed(1)}',
+                  TextStyle(color: cs.onPrimary, fontSize: 11),
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
     );

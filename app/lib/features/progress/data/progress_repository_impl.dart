@@ -146,6 +146,37 @@ class ProgressRepositoryImpl implements ProgressRepository {
   }
 
   @override
+  Future<SbdTotal> fetchSbdTotal() async {
+    try {
+      final envelope = await _apiClient.getSbdTotal();
+      final dto = envelope.data;
+      return SbdTotal(
+        squat: dto.squat,
+        bench: dto.bench,
+        deadlift: dto.deadlift,
+        total: dto.total,
+        liftCount: dto.liftCount,
+        monthly: dto.monthly
+            .map(
+              (m) => SbdMonthPoint(
+                month: m.month,
+                squat: m.squat,
+                bench: m.bench,
+                deadlift: m.deadlift,
+                // Fix #8: total omitted from domain model — computed at display
+                // time as squat + bench + deadlift to prevent inconsistent state.
+              ),
+            )
+            .toList(),
+        monthOverMonthDelta: dto.monthOverMonthDelta,
+        deltaVsMonth: dto.deltaVsMonth,
+      );
+    } catch (e) {
+      _mapError(e);
+    }
+  }
+
+  @override
   Future<ScoreHistory> fetchScoreHistory() async {
     try {
       final envelope = await _apiClient.getStrengthScoreHistory();

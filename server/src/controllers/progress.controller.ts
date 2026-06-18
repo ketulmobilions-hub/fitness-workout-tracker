@@ -53,6 +53,13 @@ type ScoreHistoryRow = {
   best_deadlift: string | null;
 };
 
+type SbdMonthRow = {
+  month: string;
+  squat: string | null;
+  bench: string | null;
+  deadlift: string | null;
+};
+
 type ExerciseHistoryRow = {
   session_date: Date | string;
   max_weight: string | null;
@@ -489,6 +496,141 @@ export const getVolume = async (_req: Request, res: Response): Promise<void> => 
       volume: Number(row.volume),
       sessions: Number(row.sessions),
     })),
+  });
+};
+
+export const getSbdTotal = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+
+  // Fix #1: parallelise — both queries only need userId, no inter-dependency.
+  const [allTimeBests, monthlyRows] = await Promise.all([
+    // All-time best per lift (rolling max across all dates)
+    prisma.$queryRaw<SbdBestRow[]>`
+      SELECT
+        CASE
+          WHEN e.name ILIKE '%squat%' AND e.name NOT ILIKE '%hack squat%'
+               AND e.name NOT ILIKE '%belt squat%' THEN 'squat'
+          WHEN e.name ILIKE '%bench press%' THEN 'bench'
+          WHEN e.name ILIKE '%deadlift%' AND e.name NOT ILIKE '%romanian%'
+               AND e.name NOT ILIKE '%stiff%' AND e.name NOT ILIKE '%trap bar%' THEN 'deadlift'
+        END AS category,
+        MAX(pr.value) AS best_kg
+      FROM personal_records pr
+      JOIN exercises e ON e.id = pr.exercise_id
+      WHERE pr.user_id = ${userId}::uuid
+        AND pr.record_type = 'max_weight'
+        AND (
+          (e.name ILIKE '%squat%' AND e.name NOT ILIKE '%hack squat%'
+           AND e.name NOT ILIKE '%belt squat%') OR
+          (e.name ILIKE '%bench press%') OR
+          (e.name ILIKE '%deadlift%' AND e.name NOT ILIKE '%romanian%'
+           AND e.name NOT ILIKE '%stiff%' AND e.name NOT ILIKE '%trap bar%')
+        )
+      GROUP BY category
+      HAVING MAX(pr.value) IS NOT NULL
+    `,
+    // Fix #2: cumulative rolling best per lift up to the end of each month —
+    // mirrors the pattern in getStrengthScoreHistory. Non-rolling (per-month-only)
+    // would produce an empty chart for athletes who peak different lifts in
+    // different training blocks, which is the norm in powerlifting periodisation.
+    prisma.$queryRaw<SbdMonthRow[]>`
+      WITH months AS (
+        SELECT generate_series(
+          date_trunc('month', NOW() - INTERVAL '11 months'),
+          date_trunc('month', NOW()),
+          '1 month'::interval
+        ) AS month_start
+      )
+      SELECT
+        to_char(m.month_start, 'YYYY-MM') AS month,
+        (
+          SELECT MAX(pr.value)
+          FROM personal_records pr
+          JOIN exercises e ON e.id = pr.exercise_id
+          WHERE pr.user_id = ${userId}::uuid
+            AND pr.record_type = 'max_weight'
+            AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+            AND e.name ILIKE '%squat%'
+            AND e.name NOT ILIKE '%hack squat%'
+            AND e.name NOT ILIKE '%belt squat%'
+        ) AS squat,
+        (
+          SELECT MAX(pr.value)
+          FROM personal_records pr
+          JOIN exercises e ON e.id = pr.exercise_id
+          WHERE pr.user_id = ${userId}::uuid
+            AND pr.record_type = 'max_weight'
+            AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+            AND e.name ILIKE '%bench press%'
+        ) AS bench,
+        (
+          SELECT MAX(pr.value)
+          FROM personal_records pr
+          JOIN exercises e ON e.id = pr.exercise_id
+          WHERE pr.user_id = ${userId}::uuid
+            AND pr.record_type = 'max_weight'
+            AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+            AND e.name ILIKE '%deadlift%'
+            AND e.name NOT ILIKE '%romanian%'
+            AND e.name NOT ILIKE '%stiff%'
+            AND e.name NOT ILIKE '%trap bar%'
+        ) AS deadlift
+      FROM months m ORDER BY m.month_start ASC
+    `,
+  ]);
+
+  const bests: Record<string, number> = {};
+  for (const row of allTimeBests) {
+    if (row.category) bests[row.category] = Number(row.best_kg);
+  }
+
+  const currentSquat = bests['squat'] ?? null;
+  const currentBench = bests['bench'] ?? null;
+  const currentDeadlift = bests['deadlift'] ?? null;
+  const liftCount = [currentSquat, currentBench, currentDeadlift].filter((v) => v != null).length;
+  const currentTotal =
+    currentSquat != null && currentBench != null && currentDeadlift != null
+      ? currentSquat + currentBench + currentDeadlift
+      : null;
+
+  const monthly: Array<{
+    month: string;
+    squat: number;
+    bench: number;
+    deadlift: number;
+  }> = [];
+
+  for (const row of monthlyRows) {
+    const squat = row.squat != null ? Number(row.squat) : null;
+    const bench = row.bench != null ? Number(row.bench) : null;
+    const deadlift = row.deadlift != null ? Number(row.deadlift) : null;
+    if (squat != null && bench != null && deadlift != null) {
+      monthly.push({ month: row.month, squat, bench, deadlift });
+    }
+  }
+
+  // Fix #3: include the comparison month label so clients can show "vs May"
+  // rather than an unlabelled delta that users may misread as always month-over-month.
+  let monthOverMonthDelta: number | null = null;
+  let deltaVsMonth: string | null = null;
+  if (monthly.length >= 2) {
+    const last = monthly[monthly.length - 1];
+    const prev = monthly[monthly.length - 2];
+    const lastTotal = last.squat + last.bench + last.deadlift;
+    const prevTotal = prev.squat + prev.bench + prev.deadlift;
+    monthOverMonthDelta = Math.round((lastTotal - prevTotal) * 10) / 10;
+    deltaVsMonth = prev.month;
+  }
+
+  sendSuccess(res, {
+    squat: currentSquat,
+    bench: currentBench,
+    deadlift: currentDeadlift,
+    total: currentTotal,
+    liftCount,
+    monthly,
+    monthOverMonthDelta,
+    deltaVsMonth,
   });
 };
 
