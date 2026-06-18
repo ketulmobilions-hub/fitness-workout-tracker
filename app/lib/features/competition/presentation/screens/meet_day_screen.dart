@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
 import '../../providers/competition_providers.dart';
+import '../widgets/attempt_calculator_sheet.dart';
 import '../widgets/attempt_cell.dart';
 import '../widgets/meet_total_banner.dart';
 
@@ -47,6 +48,18 @@ class MeetDayScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(comp.name),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: 'Attempt Calculator',
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => const AttemptCalculatorSheet(),
+            ),
+          ),
           if (comp.federation != null)
             Padding(
               padding: const EdgeInsets.only(right: 16),
