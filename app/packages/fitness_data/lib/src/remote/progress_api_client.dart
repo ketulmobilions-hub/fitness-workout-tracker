@@ -31,4 +31,7 @@ abstract class ProgressApiClient {
     @Query('period') required String period,
     @Query('granularity') String? granularity,
   });
+
+  @GET('/api/v1/progress/strength-scores/history')
+  Future<ScoreHistoryEnvelopeDto> getStrengthScoreHistory();
 }

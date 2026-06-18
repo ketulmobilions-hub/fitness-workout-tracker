@@ -47,6 +47,7 @@ const volumeQuerySchema = z.object({
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 router.get('/overview', validate({ query: overviewQuerySchema }), progress.getOverview);
+router.get('/strength-scores/history', progress.getStrengthScoreHistory);
 router.get(
   '/exercise/:id',
   validate({ params: exerciseProgressParamsSchema, query: exerciseProgressQuerySchema }),

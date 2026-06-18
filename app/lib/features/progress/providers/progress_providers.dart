@@ -127,6 +127,37 @@ class PersonalRecordsNotifier extends _$PersonalRecordsNotifier {
 }
 
 // ---------------------------------------------------------------------------
+// Strength score history — last 24 months
+// ---------------------------------------------------------------------------
+
+@Riverpod(keepAlive: true)
+class StrengthScoreHistoryNotifier extends _$StrengthScoreHistoryNotifier {
+  @override
+  Future<ScoreHistory> build() {
+    // Mirror the same completedSessions trigger used by ProgressOverviewNotifier
+    // so the trend chart stays in sync when a new SBD PR is set.
+    ref.listen(completedSessionsProvider, (previous, next) {
+      if ((previous is AsyncData || previous is AsyncError) &&
+          next is AsyncData) {
+        refresh();
+      }
+    });
+    return ref.watch(progressRepositoryProvider).fetchScoreHistory();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    try {
+      final history =
+          await ref.read(progressRepositoryProvider).fetchScoreHistory();
+      state = AsyncValue.data(history);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Exercise progress — keyed by (exerciseId, period)
 // ---------------------------------------------------------------------------
 

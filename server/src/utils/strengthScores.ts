@@ -102,9 +102,15 @@ export type StrengthScores = {
   ipfGl: number | null;
 };
 
-/** Compute all three scores in one call. Unknown genders treated as 'M'. */
+/** Compute all three scores in one call.
+ *  Returns all-null when gender is not a recognised value ('M', 'F', 'Mx') —
+ *  silently applying male coefficients for an unrecognised string would produce
+ *  wrong scores with no indication to the user. */
 export function computeAllScores(totalKg: number, bodyweightKg: number, gender: string): StrengthScores {
-  const g: Gender = (gender === 'F' ? 'F' : gender === 'Mx' ? 'Mx' : 'M');
+  if (gender !== 'M' && gender !== 'F' && gender !== 'Mx') {
+    return { wilks: null, dots: null, ipfGl: null };
+  }
+  const g: Gender = gender;
   return {
     wilks: computeWilks(totalKg, bodyweightKg, g),
     dots: computeDots(totalKg, bodyweightKg, g),
