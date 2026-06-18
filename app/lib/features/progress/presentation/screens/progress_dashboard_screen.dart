@@ -140,6 +140,11 @@ class _ProgressDashboardScreenState
               ),
             ),
 
+            // Strength balance ratios — collapsible, below main charts
+            const SliverToBoxAdapter(
+              child: _StrengthBalanceCard(),
+            ),
+
             // Personal records
             SliverToBoxAdapter(
               child: _SectionCard(
@@ -220,7 +225,7 @@ class _OverviewSection extends ConsumerWidget {
           _StreakCard(overview: overview),
           if (atRisk) ...[
             const SizedBox(height: 8),
-            _StreakWarningBanner(),
+            const _StreakWarningBanner(),
           ],
           const SizedBox(height: 12),
           _StatsGrid(overview: overview),
@@ -1017,7 +1022,7 @@ class _StrengthScoreTrendCard extends ConsumerWidget {
           ),
         ),
       ),
-      error: (_, __) => Padding(
+      error: (_, _) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         child: Card(
           child: Padding(
@@ -1246,7 +1251,7 @@ class _ScoreTrendChart extends StatelessWidget {
               barWidth: 2.5,
               dotData: FlDotData(
                 show: true,
-                getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                getDotPainter: (_, _, _, _) => FlDotCirclePainter(
                   radius: 3,
                   color: cs.primary,
                   strokeWidth: 0,
@@ -1634,6 +1639,373 @@ class _PersonalRecordTile extends StatelessWidget {
     final min = (secPerKm / 60).floor();
     final sec = (secPerKm % 60).toInt();
     return '$min:${sec.toString().padLeft(2, '0')}/km';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Strength balance ratios card
+// ---------------------------------------------------------------------------
+
+// Expected S/B/D ratios relative to squat for raw powerlifting.
+// Female bench is typically ~0.56× vs male 0.65×; deadlift stays at 1.1× for both.
+const _kMaleRatios = (squat: 1.0, bench: 0.65, deadlift: 1.10);
+const _kFemaleRatios = (squat: 1.0, bench: 0.56, deadlift: 1.10);
+
+class _StrengthBalanceCard extends ConsumerStatefulWidget {
+  const _StrengthBalanceCard();
+
+  @override
+  ConsumerState<_StrengthBalanceCard> createState() =>
+      _StrengthBalanceCardState();
+}
+
+class _StrengthBalanceCardState extends ConsumerState<_StrengthBalanceCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final sbdAsync = ref.watch(sbdTotalProvider);
+    final profile = ref.watch(profileStreamProvider).value;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return sbdAsync.when(
+      // Don't render a skeleton for this card — SBD data is already loaded by
+      // _SbdTotalCard above it, so the loading state is extremely brief.
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (sbd) {
+        // Need squat (the baseline) and at least one other lift to show ratios.
+        if (sbd.liftCount < 2 || sbd.squat == null) return const SizedBox.shrink();
+
+        final gender = profile?.gender;
+        final ratios = gender == 'F' ? _kFemaleRatios : _kMaleRatios;
+        final squat = sbd.squat;
+        final bench = sbd.bench;
+        final deadlift = sbd.deadlift;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Tappable header row — expands/collapses the card body
+                Semantics(
+                  button: true,
+                  label: 'Strength Balance, ${_expanded ? 'expanded' : 'collapsed'}',
+                  child: InkWell(
+                    onTap: () => setState(() => _expanded = !_expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Row(
+                        children: [
+                          Icon(Icons.balance, size: 20, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Strength Balance',
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            _expanded
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                if (_expanded) ...[
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _StrengthBalanceChart(
+                          squat: squat,
+                          bench: bench,
+                          deadlift: deadlift,
+                          ratios: ratios,
+                        ),
+                        const SizedBox(height: 16),
+                        _StrengthInsights(
+                          squat: squat,
+                          bench: bench,
+                          deadlift: deadlift,
+                          ratios: ratios,
+                          gender: gender,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StrengthBalanceChart extends StatelessWidget {
+  const _StrengthBalanceChart({
+    required this.squat,
+    required this.bench,
+    required this.deadlift,
+    required this.ratios,
+  });
+
+  final double? squat;
+  final double? bench;
+  final double? deadlift;
+  final ({double squat, double bench, double deadlift}) ratios;
+
+  // Color encodes how close the lift is to its standard:
+  // ≥95% of target → green, ≥85% → yellow, <85% → red.
+  // Squat is always the baseline, so it's always at 100% of its own standard.
+  Color _barColor(double actual, double target, ColorScheme cs) {
+    if (target == 0) return cs.primary;
+    final pct = actual / target;
+    if (pct >= 0.95) return Colors.green;
+    if (pct >= 0.85) return Colors.orange;
+    return cs.error;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final squat = this.squat;
+    // Chart can't render without the squat baseline.
+    if (squat == null) return const SizedBox.shrink();
+
+    final benchTarget = squat * ratios.bench;
+    final deadliftTarget = squat * ratios.deadlift;
+
+    // maxY = highest of all actuals and all targets, padded by 10%.
+    final values = [
+      squat, squat * ratios.squat,
+      if (bench != null) ...[bench!, benchTarget],
+      if (deadlift != null) ...[deadlift!, deadliftTarget],
+    ];
+    final maxY = values.reduce((a, b) => a > b ? a : b) * 1.15;
+
+    BarChartRodData rod(double actual, double target, {bool showTarget = true}) {
+      final color = _barColor(actual, target, cs);
+      return BarChartRodData(
+        toY: actual,
+        color: color,
+        width: 36,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+        // Background rod shows the target as a grey cap above the actual bar
+        // when the lift is below standard. Hidden when actual == target
+        // (i.e. squat vs its own baseline) — nothing to show.
+        backDrawRodData: BackgroundBarChartRodData(
+          show: showTarget,
+          toY: target,
+          color: cs.surfaceContainerHighest,
+        ),
+      );
+    }
+
+    final groups = <BarChartGroupData>[
+      // showTarget: false — squat is the baseline, actual always equals its own target.
+      BarChartGroupData(x: 0, barRods: [rod(squat, squat * ratios.squat, showTarget: false)]),
+      if (bench != null)
+        BarChartGroupData(x: 1, barRods: [rod(bench!, benchTarget)]),
+      if (deadlift != null)
+        BarChartGroupData(x: 2, barRods: [rod(deadlift!, deadliftTarget)]),
+    ];
+
+    // Keyed by the fl_chart X coordinate — not a positional list — so axis
+    // titles and tooltips are correct even when bench is absent (x: 2 for
+    // deadlift would be out of range on a positional list of length 2).
+    final xToLabel = <int, String>{
+      0: 'Squat',
+      if (bench != null) 1: 'Bench',
+      if (deadlift != null) 2: 'Deadlift',
+    };
+
+    return SizedBox(
+      height: 200,
+      child: BarChart(
+        BarChartData(
+          maxY: maxY,
+          minY: 0,
+          barGroups: groups,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 28,
+                getTitlesWidget: (value, meta) {
+                  final label = xToLabel[value.toInt()];
+                  if (label == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant),
+                    ),
+                  );
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 48,
+                getTitlesWidget: (value, meta) {
+                  if (value == meta.max || value == meta.min) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    '${value.toInt()} kg',
+                    style:
+                        TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                final liftName = xToLabel[group.x] ?? '';
+                final target = switch (liftName) {
+                  'Squat' => squat * ratios.squat,
+                  'Bench' => squat * ratios.bench,
+                  _ => squat * ratios.deadlift,
+                };
+                final pct = ((rod.toY / target) * 100).round();
+                return BarTooltipItem(
+                  '$liftName\n${rod.toY.toStringAsFixed(1)} kg ($pct% of target)',
+                  TextStyle(color: cs.onPrimary, fontSize: 11),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StrengthInsights extends StatelessWidget {
+  const _StrengthInsights({
+    required this.squat,
+    required this.bench,
+    required this.deadlift,
+    required this.ratios,
+    required this.gender,
+  });
+
+  final double? squat;
+  final double? bench;
+  final double? deadlift;
+  final ({double squat, double bench, double deadlift}) ratios;
+  final String? gender;
+
+  @override
+  Widget build(BuildContext context) {
+    final squat = this.squat;
+    if (squat == null) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final insights = <Widget>[];
+
+    void addInsight(String liftName, double? actual, double target) {
+      if (actual == null) return;
+      final gap = target - actual;
+      final pct = ((actual / target) * 100).round();
+      Color color;
+      String msg;
+
+      if (actual >= target * 0.95) {
+        color = Colors.green;
+        msg = 'Your $liftName (${actual.toStringAsFixed(1)} kg) is on target '
+            '($pct% of the expected ${target.toStringAsFixed(1)} kg).';
+      } else if (actual >= target * 0.85) {
+        color = Colors.orange;
+        msg = 'Your $liftName (${actual.toStringAsFixed(1)} kg) is $pct% of '
+            'the expected ${target.toStringAsFixed(1)} kg — '
+            '${gap.toStringAsFixed(1)} kg below standard.';
+      } else {
+        color = cs.error;
+        msg = 'Your $liftName (${actual.toStringAsFixed(1)} kg) is $pct% of '
+            'the expected ${target.toStringAsFixed(1)} kg — '
+            '${gap.toStringAsFixed(1)} kg below standard. Consider prioritising $liftName work.';
+      }
+
+      insights.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Icon(Icons.circle, size: 8, color: color),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  msg,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final standardLabel = gender == 'F' ? 'female raw' : 'male raw';
+    addInsight('bench', bench, squat * ratios.bench);
+    addInsight('deadlift', deadlift, squat * ratios.deadlift);
+
+    if (insights.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Insights · $standardLabel standards',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...insights,
+      ],
+    );
   }
 }
 
