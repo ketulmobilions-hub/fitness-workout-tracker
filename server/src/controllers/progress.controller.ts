@@ -46,6 +46,13 @@ type SbdBestRow = {
   best_kg: string;
 };
 
+type ScoreHistoryRow = {
+  month: string;       // 'YYYY-MM'
+  best_squat: string | null;
+  best_bench: string | null;
+  best_deadlift: string | null;
+};
+
 type ExerciseHistoryRow = {
   session_date: Date | string;
   max_weight: string | null;
@@ -483,4 +490,89 @@ export const getVolume = async (_req: Request, res: Response): Promise<void> => 
       sessions: Number(row.sessions),
     })),
   });
+};
+
+export const getStrengthScoreHistory = async (_req: Request, res: Response): Promise<void> => {
+  const { userId } = res.locals.auth!;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bodyweightKg: true, gender: true },
+  });
+
+  // Without bodyweight and gender the formula cannot produce a score.
+  if (!user?.bodyweightKg || !user?.gender) {
+    sendSuccess(res, { data: [] });
+    return;
+  }
+
+  // For each of the last 24 months, compute the cumulative best (rolling)
+  // SBD PR achieved up to the end of that month. Scores are only emitted for
+  // months where all three lifts have at least one PR on record.
+  // The three correlated subqueries are independent and cheap — each is
+  // bounded by (user_id, record_type) which benefits from the PR table index.
+  const rows = await prisma.$queryRaw<ScoreHistoryRow[]>`
+    WITH months AS (
+      SELECT generate_series(
+        date_trunc('month', NOW() - INTERVAL '23 months'),
+        date_trunc('month', NOW()),
+        '1 month'::interval
+      ) AS month_start
+    )
+    SELECT
+      to_char(m.month_start, 'YYYY-MM') AS month,
+      (
+        SELECT MAX(pr.value)
+        FROM personal_records pr
+        JOIN exercises e ON e.id = pr.exercise_id
+        WHERE pr.user_id = ${userId}::uuid
+          AND pr.record_type = 'max_weight'
+          AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+          AND e.name ILIKE '%squat%'
+          AND e.name NOT ILIKE '%hack squat%'
+          AND e.name NOT ILIKE '%belt squat%'
+      ) AS best_squat,
+      (
+        SELECT MAX(pr.value)
+        FROM personal_records pr
+        JOIN exercises e ON e.id = pr.exercise_id
+        WHERE pr.user_id = ${userId}::uuid
+          AND pr.record_type = 'max_weight'
+          AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+          AND e.name ILIKE '%bench press%'
+      ) AS best_bench,
+      (
+        SELECT MAX(pr.value)
+        FROM personal_records pr
+        JOIN exercises e ON e.id = pr.exercise_id
+        WHERE pr.user_id = ${userId}::uuid
+          AND pr.record_type = 'max_weight'
+          AND pr.achieved_at < m.month_start + INTERVAL '1 month'
+          AND e.name ILIKE '%deadlift%'
+          AND e.name NOT ILIKE '%romanian%'
+          AND e.name NOT ILIKE '%stiff%'
+          AND e.name NOT ILIKE '%trap bar%'
+      ) AS best_deadlift
+    FROM months m
+    ORDER BY m.month_start ASC
+  `;
+
+  const points: Array<{ month: string; wilks: number | null; dots: number | null; ipfGl: number | null }> = [];
+
+  for (const row of rows) {
+    const squat = row.best_squat != null ? Number(row.best_squat) : null;
+    const bench = row.best_bench != null ? Number(row.best_bench) : null;
+    const deadlift = row.best_deadlift != null ? Number(row.best_deadlift) : null;
+
+    if (squat == null || bench == null || deadlift == null) {
+      // Omit months with incomplete SBD history — partial totals mislead.
+      continue;
+    }
+
+    const total = squat + bench + deadlift;
+    const scores = computeAllScores(total, user.bodyweightKg, user.gender);
+    points.push({ month: row.month, ...scores });
+  }
+
+  sendSuccess(res, points);
 };

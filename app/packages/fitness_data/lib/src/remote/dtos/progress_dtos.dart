@@ -157,6 +157,35 @@ abstract class PersonalRecordsEnvelopeDto with _$PersonalRecordsEnvelopeDto {
 }
 
 // ---------------------------------------------------------------------------
+// Strength score history DTOs
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class ScoreHistoryPointDto with _$ScoreHistoryPointDto {
+  const factory ScoreHistoryPointDto({
+    required String month,
+    @Default(null) double? wilks,
+    @Default(null) double? dots,
+    @Default(null) double? ipfGl,
+  }) = _ScoreHistoryPointDto;
+
+  factory ScoreHistoryPointDto.fromJson(Map<String, dynamic> json) =>
+      _$ScoreHistoryPointDtoFromJson(json);
+}
+
+// Server sends sendSuccess(res, points) — data field is the array directly.
+@freezed
+abstract class ScoreHistoryEnvelopeDto with _$ScoreHistoryEnvelopeDto {
+  const factory ScoreHistoryEnvelopeDto({
+    required int status,
+    @Default([]) List<ScoreHistoryPointDto> data,
+  }) = _ScoreHistoryEnvelopeDto;
+
+  factory ScoreHistoryEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$ScoreHistoryEnvelopeDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
 // Volume DTOs
 // ---------------------------------------------------------------------------
 

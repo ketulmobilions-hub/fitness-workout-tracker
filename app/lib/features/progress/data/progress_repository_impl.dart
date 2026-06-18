@@ -144,4 +144,25 @@ class ProgressRepositoryImpl implements ProgressRepository {
       _mapError(e);
     }
   }
+
+  @override
+  Future<ScoreHistory> fetchScoreHistory() async {
+    try {
+      final envelope = await _apiClient.getStrengthScoreHistory();
+      return ScoreHistory(
+        points: envelope.data
+            .map(
+              (p) => ScoreHistoryPoint(
+                month: p.month,
+                wilks: p.wilks,
+                dots: p.dots,
+                ipfGl: p.ipfGl,
+              ),
+            )
+            .toList(),
+      );
+    } catch (e) {
+      _mapError(e);
+    }
+  }
 }

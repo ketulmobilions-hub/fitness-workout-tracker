@@ -1,6 +1,7 @@
 import 'exercise_progress.dart';
 import 'progress_overview.dart';
 import 'progress_personal_record.dart';
+import 'score_history.dart';
 import 'volume_data.dart';
 
 abstract class ProgressRepository {
@@ -34,4 +35,8 @@ abstract class ProgressRepository {
   /// [period] must be one of: '1w', '1m', '3m', '6m', '1y'.
   /// [granularity] is auto-inferred by the server when omitted.
   Future<VolumeData> fetchVolume(String period, {String? granularity});
+
+  /// Fetches the last 24 months of Wilks/Dots/IPF GL score history.
+  /// Only months where all three SBD PRs exist are included.
+  Future<ScoreHistory> fetchScoreHistory();
 }

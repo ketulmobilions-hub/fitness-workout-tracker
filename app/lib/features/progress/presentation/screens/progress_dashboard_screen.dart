@@ -71,6 +71,7 @@ class _ProgressDashboardScreenState
           await Future.wait([
             ref.read(progressOverviewProvider.notifier).refresh(),
             ref.read(personalRecordsProvider.notifier).refresh(),
+            ref.read(strengthScoreHistoryProvider.notifier).refresh(),
             // ref.refresh atomically invalidates and returns the new future,
             // avoiding the separate invalidate + read(.future) race.
             ref.refresh(volumeDataProvider(volumeKey).future),
@@ -103,6 +104,11 @@ class _ProgressDashboardScreenState
                   scoreSystem: scoreSystem,
                 ),
               ) ?? const SizedBox.shrink(),
+            ),
+
+            // Strength score trend chart
+            SliverToBoxAdapter(
+              child: _StrengthScoreTrendCard(scoreSystem: scoreSystem),
             ),
 
             // Volume chart
@@ -568,6 +574,383 @@ class _BenchmarkBar extends StatelessWidget {
                   : isIntermediate
                       ? Colors.orange
                       : cs.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Strength score trend chart
+// ---------------------------------------------------------------------------
+
+class _StrengthScoreTrendCard extends ConsumerWidget {
+  const _StrengthScoreTrendCard({required this.scoreSystem});
+
+  final ScoreSystem scoreSystem;
+
+  /// Most-recent non-null score for [scoreSystem] across [points].
+  /// Scans in reverse so it matches the rightmost dot on the chart.
+  double? _latestScore(List<ScoreHistoryPoint> points) {
+    for (var i = points.length - 1; i >= 0; i--) {
+      final s = switch (scoreSystem) {
+        ScoreSystem.wilks => points[i].wilks,
+        ScoreSystem.dots => points[i].dots,
+        ScoreSystem.ipfGl => points[i].ipfGl,
+      };
+      if (s != null) return s;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(strengthScoreHistoryProvider);
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return historyAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Score Trend',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 16),
+                const _ChartSkeleton(),
+              ],
+            ),
+          ),
+        ),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Score Trend',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                _ErrorTile(
+                  message: 'Could not load score history',
+                  onRetry: () => ref
+                      .read(strengthScoreHistoryProvider.notifier)
+                      .refresh(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      data: (history) {
+        final points = history.points;
+
+        // Require at least 2 scored months to form a meaningful trend line.
+        // Fewer points = no chart, no empty placeholder.
+        final latestScore = _latestScore(points);
+        final scoredCount = points.where((p) {
+          final s = switch (scoreSystem) {
+            ScoreSystem.wilks => p.wilks,
+            ScoreSystem.dots => p.dots,
+            ScoreSystem.ipfGl => p.ipfGl,
+          };
+          return s != null;
+        }).length;
+
+        if (latestScore == null || scoredCount < 2) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.show_chart, size: 20, color: cs.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Score Trend',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      // Chip derived from same rightmost-dot logic as chart —
+                      // consistent even when recent months have null scores.
+                      _ScoreCategoryChip(
+                        score: latestScore,
+                        scoreSystem: scoreSystem,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _ScoreTrendChart(
+                    points: points,
+                    scoreSystem: scoreSystem,
+                  ),
+                  const SizedBox(height: 8),
+                  // Bodyweight disclaimer — scores use the current profile
+                  // bodyweight for all historical months (no history table yet).
+                  Text(
+                    '* Based on current bodyweight',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ScoreCategoryChip extends StatelessWidget {
+  const _ScoreCategoryChip({
+    required this.score,
+    required this.scoreSystem,
+  });
+
+  final double score;
+  final ScoreSystem scoreSystem;
+
+  String get _label {
+    if (scoreSystem == ScoreSystem.ipfGl) {
+      if (score >= 85) return 'Elite';
+      if (score >= 70) return 'Advanced';
+      if (score >= 50) return 'Intermediate';
+      return 'Beginner';
+    }
+    if (score >= 400) return 'Elite';
+    if (score >= 300) return 'Advanced';
+    if (score >= 200) return 'Intermediate';
+    return 'Beginner';
+  }
+
+  Color _color(ColorScheme cs) {
+    return switch (_label) {
+      'Elite' => Colors.purple,
+      'Advanced' => cs.primary,
+      'Intermediate' => Colors.orange,
+      _ => cs.onSurfaceVariant,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = _color(cs);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        _label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+    );
+  }
+}
+
+class _ScoreTrendChart extends StatelessWidget {
+  const _ScoreTrendChart({
+    required this.points,
+    required this.scoreSystem,
+  });
+
+  final List<ScoreHistoryPoint> points;
+  final ScoreSystem scoreSystem;
+
+  // Benchmark thresholds per scoring system (beginner/intermediate/advanced boundaries).
+  List<double> get _benchmarks => scoreSystem == ScoreSystem.ipfGl
+      ? [50, 70, 85]
+      : [200, 300, 400];
+
+  double get _maxY => scoreSystem == ScoreSystem.ipfGl ? 120 : 500;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final indexedScores = <int, double>{};
+    for (var i = 0; i < points.length; i++) {
+      final s = switch (scoreSystem) {
+        ScoreSystem.wilks => points[i].wilks,
+        ScoreSystem.dots => points[i].dots,
+        ScoreSystem.ipfGl => points[i].ipfGl,
+      };
+      if (s != null) indexedScores[i] = s;
+    }
+
+    final spots = indexedScores.entries
+        .map((e) => FlSpot(e.key.toDouble(), e.value))
+        .toList();
+
+    if (spots.length < 2) return const SizedBox.shrink();
+
+    final allScores = indexedScores.values.toList();
+    final minScore = allScores.reduce((a, b) => a < b ? a : b);
+    final maxScore = allScores.reduce((a, b) => a > b ? a : b);
+    // Pad the Y axis so benchmark lines and the line itself don't sit on edges.
+    final chartMinY = (minScore - 20).clamp(0, _maxY);
+    final chartMaxY = (maxScore + 30).clamp(0, _maxY);
+
+    final benchmarkColors = [
+      cs.onSurfaceVariant,
+      Colors.orange,
+      cs.primary,
+    ];
+
+    return SizedBox(
+      height: 200,
+      child: LineChart(
+        LineChartData(
+          minY: chartMinY.toDouble(),
+          maxY: chartMaxY.toDouble(),
+          extraLinesData: ExtraLinesData(
+            horizontalLines: [
+              for (var i = 0; i < _benchmarks.length; i++)
+                if (_benchmarks[i] >= chartMinY && _benchmarks[i] <= chartMaxY)
+                  HorizontalLine(
+                    y: _benchmarks[i],
+                    color: benchmarkColors[i].withValues(alpha: 0.5),
+                    strokeWidth: 1,
+                    dashArray: [6, 4],
+                    label: HorizontalLineLabel(
+                      show: true,
+                      alignment: Alignment.topRight,
+                      padding: const EdgeInsets.only(right: 4, bottom: 2),
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: benchmarkColors[i].withValues(alpha: 0.7),
+                      ),
+                      labelResolver: (_) => _benchmarks[i].toInt().toString(),
+                    ),
+                  ),
+            ],
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.25,
+              color: cs.primary,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                  radius: 3,
+                  color: cs.primary,
+                  strokeWidth: 0,
+                ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: cs.primary.withValues(alpha: 0.08),
+              ),
+            ),
+          ],
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (_) => FlLine(
+              color: cs.outlineVariant.withValues(alpha: 0.4),
+              strokeWidth: 1,
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40,
+                getTitlesWidget: (value, meta) {
+                  if (value == meta.max || value == meta.min) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    value.toInt().toString(),
+                    style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                  );
+                },
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 24,
+                interval: (spots.length / 4).ceilToDouble().clamp(1.0, 12.0),
+                getTitlesWidget: (value, meta) {
+                  final idx = value.toInt();
+                  if (idx < 0 || idx >= points.length) {
+                    return const SizedBox.shrink();
+                  }
+                  final month = points[idx].month; // 'YYYY-MM'
+                  final parts = month.split('-');
+                  if (parts.length < 2) return const SizedBox.shrink();
+                  final m = int.tryParse(parts[1]);
+                  if (m == null || m < 1 || m > 12) {
+                    return const SizedBox.shrink();
+                  }
+                  const abbr = [
+                    '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+                  ];
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      abbr[m],
+                      style:
+                          TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                    ),
+                  );
+                },
+              ),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
+                final idx = spot.x.toInt();
+                if (idx < 0 || idx >= points.length) return null;
+                final p = points[idx];
+                final label = switch (scoreSystem) {
+                  ScoreSystem.wilks => 'Wilks',
+                  ScoreSystem.dots => 'Dots',
+                  ScoreSystem.ipfGl => 'IPF GL',
+                };
+                return LineTooltipItem(
+                  '${p.month}\n${spot.y.toStringAsFixed(1)} $label',
+                  TextStyle(color: cs.onPrimary, fontSize: 12),
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
     );
