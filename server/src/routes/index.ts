@@ -10,6 +10,7 @@ import progressRoutes from './progress.routes.js';
 import streakRoutes from './streak.routes.js';
 import userRoutes from './user.routes.js';
 import referenceRoutes from './reference.routes.js';
+import trainingMaxRoutes from './training-max.routes.js';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/progress', progressRoutes);
 router.use('/streaks', streakRoutes);
 router.use('/users', userRoutes);
 router.use('/reference', referenceRoutes);
+router.use('/training-maxes', trainingMaxRoutes);
 
 export default router;

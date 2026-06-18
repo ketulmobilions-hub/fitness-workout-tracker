@@ -8,6 +8,7 @@ import '../../../auth/providers/auth_state.dart';
 import '../../../workout_plans/providers/workout_plan_providers.dart';
 import '../../providers/profile_providers.dart';
 import '../widgets/guest_upgrade_card.dart';
+import 'training_max_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -179,6 +180,21 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
           ],
+
+          const Divider(),
+
+          // -- Training section
+          const _SectionHeader(title: 'Training'),
+          ListTile(
+            leading: const Icon(Icons.fitness_center),
+            title: const Text('Training Maxes'),
+            subtitle: const Text('Set % of 1RM baselines for programs'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const TrainingMaxScreen(),
+              ),
+            ),
+          ),
 
           const Divider(),
 

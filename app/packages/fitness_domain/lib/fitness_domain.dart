@@ -37,3 +37,6 @@ export 'src/profile/user_preferences.dart';
 export 'src/profile/user_profile.dart';
 export 'src/profile/user_stats.dart';
 export 'src/profile/profile_repository.dart';
+
+export 'src/training_max/training_max.dart';
+export 'src/training_max/training_max_repository.dart';
