@@ -169,6 +169,27 @@ class _ProgressDashboardScreenState
               ),
             ),
 
+            // Competition history shortcut
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant),
+                  ),
+                  leading: const Icon(Icons.emoji_events_outlined),
+                  title: const Text('Competition History'),
+                  subtitle: const Text('Past meet results & Wilks/Dots trend'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(AppRoutes.competitionHistory),
+                ),
+              ),
+            ),
+
             const SliverPadding(padding: EdgeInsets.only(bottom: 32)),
           ],
         ),
