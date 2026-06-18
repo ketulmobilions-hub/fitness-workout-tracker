@@ -52,6 +52,23 @@ enum SyncOperation {
   delete
 }
 
+enum CompetitionStatus {
+  upcoming
+  completed
+}
+
+enum LiftType {
+  squat
+  bench
+  deadlift
+}
+
+enum AttemptResult {
+  good_lift
+  no_lift
+  not_taken
+}
+
 // ─── Users & Auth ────────────────────────────────────────
 
 model User {
@@ -83,6 +100,7 @@ model User {
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
   trainingMaxes       TrainingMax[]
+  competitions        Competition[]
 
   @@map("users")
 }
@@ -398,6 +416,47 @@ model TrainingMax {
   @@unique([userId, exerciseId])
   @@index([userId])
   @@map("training_maxes")
+}
+
+// ─── Competitions ────────────────────────────────────────
+
+model Competition {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  name          String
+  federation    String?
+  date          DateTime          @db.Date
+  location      String?
+  weightClassKg Float?            @map("weight_class_kg")
+  bodyweightKg  Float?            @map("bodyweight_kg")
+  division      String?
+  status        CompetitionStatus @default(upcoming)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts CompetitionAttempt[]
+
+  @@index([userId])
+  @@index([userId, date])
+  @@map("competitions")
+}
+
+model CompetitionAttempt {
+  id            String        @id @default(uuid()) @db.Uuid
+  competitionId String        @map("competition_id") @db.Uuid
+  liftType      LiftType      @map("lift_type")
+  attemptNumber Int           @map("attempt_number")
+  weightKg      Float         @map("weight_kg")
+  result        AttemptResult @default(not_taken) @map("result")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@unique([competitionId, liftType, attemptNumber])
+  @@index([competitionId])
+  @@map("competition_attempts")
 }
 
 // ─── Sync ────────────────────────────────────────────────

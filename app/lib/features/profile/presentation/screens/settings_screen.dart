@@ -1,8 +1,10 @@
 import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../../core/router/app_routes.dart';
 import '../../../auth/providers/auth_notifier.dart';
 import '../../../auth/providers/auth_state.dart';
 import '../../../workout_plans/providers/workout_plan_providers.dart';
@@ -194,6 +196,12 @@ class SettingsScreen extends ConsumerWidget {
                 builder: (_) => const TrainingMaxScreen(),
               ),
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.emoji_events_outlined),
+            title: const Text('Start Meet'),
+            subtitle: const Text('Enter meet day mode to track attempts'),
+            onTap: () => context.push(AppRoutes.startMeet),
           ),
 
           const Divider(),

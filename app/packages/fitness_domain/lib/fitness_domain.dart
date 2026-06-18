@@ -41,3 +41,5 @@ export 'src/profile/profile_repository.dart';
 
 export 'src/training_max/training_max.dart';
 export 'src/training_max/training_max_repository.dart';
+
+export 'src/competitions/competition.dart';
