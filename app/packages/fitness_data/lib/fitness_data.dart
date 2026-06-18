@@ -26,6 +26,8 @@ export 'src/remote/reference_api_client.dart';
 export 'src/remote/dtos/reference_dtos.dart';
 export 'src/remote/training_max_api_client.dart';
 export 'src/remote/dtos/training_max_dtos.dart';
+export 'src/remote/competition_api_client.dart';
+export 'src/remote/dtos/competition_dtos.dart';
 
 // Local database
 export 'src/local/app_database.dart';

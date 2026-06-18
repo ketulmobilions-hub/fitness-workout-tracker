@@ -64,6 +64,10 @@ abstract final class AppRoutes {
   static const progress = '/progress';
   static const exerciseProgress = '/progress/exercises/:exerciseId';
 
+  // Competition routes
+  static const startMeet = '/competition/start';
+  static const meetDay = '/competition/meet-day';
+
   // Profile routes
   static const profile = '/profile';
   static const editProfile = '/profile/edit';

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../features/competition/presentation/screens/meet_day_screen.dart';
+import '../../features/competition/presentation/screens/start_meet_screen.dart';
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/home_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -322,6 +324,16 @@ GoRouter appRouter(Ref ref) {
         parentNavigatorKey: _rootKey,
         path: AppRoutes.settings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.startMeet,
+        builder: (context, state) => const StartMeetScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: AppRoutes.meetDay,
+        builder: (context, state) => const MeetDayScreen(),
       ),
     ],
   );
