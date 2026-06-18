@@ -196,4 +196,39 @@ class ProgressRepositoryImpl implements ProgressRepository {
       _mapError(e);
     }
   }
+
+  @override
+  Future<VolumeZoneAnalysis> fetchVolumeZones({
+    int weeks = 12,
+    int utcOffset = 0,
+  }) async {
+    try {
+      final envelope = await _apiClient.getVolumeZones(
+        weeks: weeks,
+        utcOffset: utcOffset,
+      );
+      final dto = envelope.data;
+      return VolumeZoneAnalysis(
+        weeks: dto.weeks,
+        data: dto.data
+            .map(
+              (w) => VolumeZoneWeek(
+                weekStart: DateTime.parse(w.weekStart),
+                isDeload: w.isDeload,
+                techniqueSets: w.techniqueSets,
+                techniqueTonnageKg: w.techniqueTonnageKg,
+                hypertrophySets: w.hypertrophySets,
+                hypertrophyTonnageKg: w.hypertrophyTonnageKg,
+                strengthSets: w.strengthSets,
+                strengthTonnageKg: w.strengthTonnageKg,
+                maxEffortSets: w.maxEffortSets,
+                maxEffortTonnageKg: w.maxEffortTonnageKg,
+              ),
+            )
+            .toList(),
+      );
+    } catch (e) {
+      _mapError(e);
+    }
+  }
 }

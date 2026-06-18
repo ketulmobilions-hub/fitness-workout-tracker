@@ -189,6 +189,38 @@ class SbdTotalNotifier extends _$SbdTotalNotifier {
 // Exercise progress — keyed by (exerciseId, period)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Volume zone analysis — 12-week intensity breakdown for competition lifts
+// ---------------------------------------------------------------------------
+
+@Riverpod(keepAlive: true)
+class VolumeZoneNotifier extends _$VolumeZoneNotifier {
+  @override
+  Future<VolumeZoneAnalysis> build() {
+    ref.listen(completedSessionsProvider, (previous, next) {
+      if ((previous is AsyncData || previous is AsyncError) &&
+          next is AsyncData) {
+        refresh();
+      }
+    });
+    final utcOffset = DateTime.now().timeZoneOffset.inMinutes;
+    return ref.watch(progressRepositoryProvider).fetchVolumeZones(utcOffset: utcOffset);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncValue.loading();
+    try {
+      final utcOffset = DateTime.now().timeZoneOffset.inMinutes;
+      final data = await ref
+          .read(progressRepositoryProvider)
+          .fetchVolumeZones(utcOffset: utcOffset);
+      state = AsyncValue.data(data);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
 // Issue #2: ref.watch so repository overrides are respected in tests.
 @riverpod
 Future<ExerciseProgress> exerciseProgress(

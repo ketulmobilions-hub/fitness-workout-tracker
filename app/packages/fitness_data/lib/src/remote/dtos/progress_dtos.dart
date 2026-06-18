@@ -234,6 +234,51 @@ abstract class ScoreHistoryEnvelopeDto with _$ScoreHistoryEnvelopeDto {
 }
 
 // ---------------------------------------------------------------------------
+// Volume zone DTOs
+// ---------------------------------------------------------------------------
+
+@freezed
+abstract class VolumeZoneWeekDto with _$VolumeZoneWeekDto {
+  const factory VolumeZoneWeekDto({
+    required String weekStart,
+    required bool isDeload,
+    required int techniqueSets,
+    required double techniqueTonnageKg,
+    required int hypertrophySets,
+    required double hypertrophyTonnageKg,
+    required int strengthSets,
+    required double strengthTonnageKg,
+    required int maxEffortSets,
+    required double maxEffortTonnageKg,
+  }) = _VolumeZoneWeekDto;
+
+  factory VolumeZoneWeekDto.fromJson(Map<String, dynamic> json) =>
+      _$VolumeZoneWeekDtoFromJson(json);
+}
+
+@freezed
+abstract class VolumeZoneAnalysisDto with _$VolumeZoneAnalysisDto {
+  const factory VolumeZoneAnalysisDto({
+    required int weeks,
+    @Default([]) List<VolumeZoneWeekDto> data,
+  }) = _VolumeZoneAnalysisDto;
+
+  factory VolumeZoneAnalysisDto.fromJson(Map<String, dynamic> json) =>
+      _$VolumeZoneAnalysisDtoFromJson(json);
+}
+
+@freezed
+abstract class VolumeZoneEnvelopeDto with _$VolumeZoneEnvelopeDto {
+  const factory VolumeZoneEnvelopeDto({
+    required int status,
+    required VolumeZoneAnalysisDto data,
+  }) = _VolumeZoneEnvelopeDto;
+
+  factory VolumeZoneEnvelopeDto.fromJson(Map<String, dynamic> json) =>
+      _$VolumeZoneEnvelopeDtoFromJson(json);
+}
+
+// ---------------------------------------------------------------------------
 // Volume DTOs
 // ---------------------------------------------------------------------------
 

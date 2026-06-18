@@ -26,6 +26,7 @@ export 'src/progress/progress_personal_record.dart';
 export 'src/progress/sbd_total.dart';
 export 'src/progress/score_history.dart';
 export 'src/progress/volume_data.dart';
+export 'src/progress/volume_zone_analysis.dart';
 export 'src/progress/progress_repository.dart';
 
 export 'src/streaks/streak_day_status.dart';

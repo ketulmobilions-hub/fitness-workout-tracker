@@ -4,6 +4,7 @@ import 'progress_personal_record.dart';
 import 'sbd_total.dart';
 import 'score_history.dart';
 import 'volume_data.dart';
+import 'volume_zone_analysis.dart';
 
 abstract class ProgressRepository {
   /// Fetches summary stats for the current user.
@@ -44,4 +45,10 @@ abstract class ProgressRepository {
   /// Fetches the user's all-time best SBD training total (squat + bench +
   /// deadlift) plus a 12-month monthly trend.
   Future<SbdTotal> fetchSbdTotal();
+
+  /// Fetches per-week volume breakdown by intensity zone for competition lifts.
+  /// [weeks] — how many weeks back to look (default 12, max 52).
+  /// [utcOffset] — device UTC offset in minutes; aligns week boundaries to
+  /// the user's local calendar (same convention as fetchOverview).
+  Future<VolumeZoneAnalysis> fetchVolumeZones({int weeks = 12, int utcOffset = 0});
 }
