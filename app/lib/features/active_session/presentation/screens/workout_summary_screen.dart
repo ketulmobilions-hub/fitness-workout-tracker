@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/utils/one_rm_utils.dart';
+import '../../../pr_share/pr_share.dart';
 import '../../../profile/providers/profile_providers.dart';
 import '../../../progress/providers/progress_providers.dart';
 import '../../providers/active_session_notifier.dart';
@@ -26,6 +27,37 @@ bool _sessionHasSbdPr(WorkoutSummary summary) {
         name.contains('bench press') ||
         name.contains('deadlift');
   });
+}
+
+/// Best estimated 1RM for [exerciseId] across non-warmup sets in [summary].
+double? _est1RmForExercise(WorkoutSummary summary, String exerciseId) {
+  double? best;
+  for (final ex in summary.exerciseData) {
+    if (ex.planExercise.exerciseId != exerciseId) continue;
+    for (final set in ex.loggedSets) {
+      if (set.isWarmup) continue;
+      final w = set.weightKg;
+      final r = set.reps;
+      if (w == null || r == null || r < 1) continue;
+      final est = estimateOneRepMax(w, r);
+      if (best == null || est > best) best = est;
+    }
+  }
+  return best;
+}
+
+/// RPE of the set that matches [weightKg] for [exerciseId] in [summary].
+double? _rpeForPr(WorkoutSummary summary, String exerciseId, double weightKg) {
+  for (final ex in summary.exerciseData) {
+    if (ex.planExercise.exerciseId != exerciseId) continue;
+    for (final set in ex.loggedSets) {
+      if (set.isWarmup) continue;
+      if (set.weightKg != null && (set.weightKg! - weightKg).abs() < 0.01) {
+        return set.rpe;
+      }
+    }
+  }
+  return null;
 }
 
 /// Displayed after a session is successfully completed.
@@ -258,6 +290,25 @@ class WorkoutSummaryScreen extends ConsumerWidget {
                     leading: const Icon(Icons.star, color: Colors.amber),
                     title: Text(pr.exerciseName),
                     subtitle: Text(recordLabel),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.share_outlined),
+                      tooltip: 'Share PR',
+                      onPressed: () {
+                        final cardData = PrCardData.fromNewPr(
+                          pr,
+                          estimatedOneRm: _est1RmForExercise(
+                            summary,
+                            pr.exerciseId,
+                          ),
+                          rpe: _rpeForPr(summary, pr.exerciseId, pr.value),
+                          athleteName: ref
+                              .read(profileStreamProvider)
+                              .value
+                              ?.displayName,
+                        );
+                        PrShareBottomSheet.show(context, cardData);
+                      },
+                    ),
                   );
                 },
                 childCount: summary.newPRs.length,

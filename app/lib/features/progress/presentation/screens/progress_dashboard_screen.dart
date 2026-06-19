@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../pr_share/pr_share.dart';
 import '../../../profile/providers/profile_providers.dart';
 import '../../../streak/providers/streak_providers.dart';
 import '../../providers/progress_providers.dart';
@@ -164,7 +165,10 @@ class _ProgressDashboardScreenState
                         .read(personalRecordsProvider.notifier)
                         .refresh(),
                   ),
-                  data: (records) => _PersonalRecordsList(records: records),
+                  data: (records) => _PersonalRecordsList(
+                    records: records,
+                    athleteName: profileAsync.value?.displayName,
+                  ),
                 ),
               ),
             ),
@@ -1882,9 +1886,13 @@ class _ZoneSummary extends StatelessWidget {
 // Issue #6: changed from ConsumerWidget to StatelessWidget — ref was never
 // used inside build(); navigation uses BuildContext, not Riverpod.
 class _PersonalRecordsList extends StatelessWidget {
-  const _PersonalRecordsList({required this.records});
+  const _PersonalRecordsList({
+    required this.records,
+    this.athleteName,
+  });
 
   final List<ProgressPersonalRecord> records;
+  final String? athleteName;
 
   @override
   Widget build(BuildContext context) {
@@ -1913,6 +1921,10 @@ class _PersonalRecordsList extends StatelessWidget {
           onTap: () => context.push(
             AppRoutes.exerciseProgressPath(pr.exerciseId, name: pr.exerciseName),
           ),
+          onShare: () => PrShareBottomSheet.show(
+            context,
+            PrCardData.fromProgressPr(pr, athleteName: athleteName),
+          ),
         );
       }).toList(),
     );
@@ -1920,10 +1932,15 @@ class _PersonalRecordsList extends StatelessWidget {
 }
 
 class _PersonalRecordTile extends StatelessWidget {
-  const _PersonalRecordTile({required this.record, required this.onTap});
+  const _PersonalRecordTile({
+    required this.record,
+    required this.onTap,
+    this.onShare,
+  });
 
   final ProgressPersonalRecord record;
   final VoidCallback onTap;
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -1932,6 +1949,7 @@ class _PersonalRecordTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
+      onLongPress: onShare,
       leading: CircleAvatar(
         backgroundColor: colorScheme.secondaryContainer,
         child: Icon(
@@ -1950,12 +1968,27 @@ class _PersonalRecordTile extends StatelessWidget {
           color: colorScheme.onSurfaceVariant,
         ),
       ),
-      trailing: Text(
-        _formatValue(record.recordType, record.value),
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: colorScheme.primary,
-          fontWeight: FontWeight.bold,
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatValue(record.recordType, record.value),
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: colorScheme.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (onShare != null) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.share_outlined, size: 18),
+              tooltip: 'Share PR',
+              onPressed: onShare,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ],
       ),
     );
   }
