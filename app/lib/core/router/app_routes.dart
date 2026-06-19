@@ -74,6 +74,9 @@ abstract final class AppRoutes {
 
   static String competitionDetailPath(String id) => '/competition/$id';
 
+  // Onboarding (shown once on first launch after registration)
+  static const onboarding = '/onboarding';
+
   // Profile routes
   static const profile = '/profile';
   static const editProfile = '/profile/edit';

@@ -1,4 +1,5 @@
 import 'package:fitness_domain/fitness_domain.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ironlog/core/router/app_router.dart';
 import 'package:ironlog/core/router/app_routes.dart';
 import 'package:ironlog/features/auth/providers/auth_state.dart';
@@ -11,8 +12,14 @@ void main() {
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-  String? redirect(AuthState s, String location) =>
-      resolveAuthRedirect(s, location);
+  // Most tests assume onboarding is complete (existing user flows).
+  const done = AsyncData<bool>(true);
+  const notDone = AsyncData<bool>(false);
+  const loading = AsyncLoading<bool>();
+
+  String? redirect(AuthState s, String location,
+          [AsyncValue<bool> onboarding = done]) =>
+      resolveAuthRedirect(s, onboarding, location);
 
   // ---------------------------------------------------------------------------
   // AuthInitializing — no redirects ever (stay on splash)
@@ -142,6 +149,44 @@ void main() {
 
     test('does not redirect from a protected route', () {
       expect(redirect(state, AppRoutes.home), isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Onboarding — first-launch redirect logic
+  // ---------------------------------------------------------------------------
+  group('Onboarding', () {
+    const auth = AuthState.authenticated(user: testUser);
+
+    test('redirects splash → onboarding when not done', () {
+      expect(redirect(auth, AppRoutes.splash, notDone), AppRoutes.onboarding);
+    });
+
+    test('redirects auth flow → onboarding when not done', () {
+      expect(
+        redirect(auth, AppRoutes.login, notDone),
+        AppRoutes.onboarding,
+      );
+    });
+
+    test('stays on onboarding when not done', () {
+      expect(redirect(auth, AppRoutes.onboarding, notDone), isNull);
+    });
+
+    test('redirects onboarding → home when already done', () {
+      expect(redirect(auth, AppRoutes.onboarding, done), AppRoutes.home);
+    });
+
+    test('no redirect from protected route when already done', () {
+      expect(redirect(auth, AppRoutes.home, done), isNull);
+    });
+
+    test('no redirect while onboarding state loading', () {
+      expect(redirect(auth, AppRoutes.splash, loading), isNull);
+    });
+
+    test('no redirect from protected route while loading', () {
+      expect(redirect(auth, AppRoutes.home, loading), isNull);
     });
   });
 }

@@ -7,6 +7,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../auth/providers/auth_notifier.dart';
 import '../../../auth/providers/auth_state.dart';
+import '../../../onboarding/providers/first_launch_provider.dart';
+import '../../../onboarding/providers/onboarding_notifier.dart';
 import '../../../workout_plans/providers/workout_plan_providers.dart';
 import '../../providers/profile_providers.dart';
 import '../widgets/guest_upgrade_card.dart';
@@ -203,6 +205,12 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: const Text('Enter meet day mode to track attempts'),
             onTap: () => context.push(AppRoutes.startMeet),
           ),
+          ListTile(
+            leading: const Icon(Icons.tune_outlined),
+            title: const Text('Redo Setup'),
+            subtitle: const Text('Revisit the onboarding flow'),
+            onTap: () => _redoSetup(context, ref),
+          ),
 
           const Divider(),
 
@@ -268,6 +276,21 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _redoSetup(BuildContext context, WidgetRef ref) async {
+    try {
+      ref.read(onboardingProvider.notifier).reset();
+      await ref.read(onboardingCompleteProvider.notifier).reset();
+      // Router redirect fires automatically when onboardingCompleteProvider
+      // state changes to AsyncData(false).
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not reset setup: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _updatePrefs(
