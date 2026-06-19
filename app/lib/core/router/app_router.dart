@@ -14,6 +14,7 @@ import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/providers/auth_notifier.dart';
 import '../../features/auth/providers/auth_state.dart';
+import '../../features/onboarding/onboarding.dart';
 import '../../features/exercises/presentation/screens/create_exercise_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_detail_screen.dart';
 import '../../features/exercises/presentation/screens/exercise_list_screen.dart';
@@ -50,53 +51,79 @@ final _branchKeys = [_branch0Key, _branch1Key, _branch2Key, _branch3Key];
 
 /// Pure redirect resolver — exported for unit testing.
 ///
+/// [onboardingComplete] is the async state of the first-launch flag.
+/// While still loading (`AsyncLoading`), the redirect returns `null` so the
+/// user stays on the current route until the value is known.
+///
 /// Returns the target route path when a redirect is needed, or `null` to allow
 /// the current navigation to proceed.
-String? resolveAuthRedirect(AuthState authState, String location) {
-  // Match the '/auth' route or any '/auth/...' subroute, but not unrelated
-  // paths that merely share the prefix (e.g. a future '/authors').
+String? resolveAuthRedirect(
+  AuthState authState,
+  AsyncValue<bool> onboardingComplete,
+  String location,
+) {
   final onAuthFlow = location == '/auth' || location.startsWith('/auth/');
   final onSplash = location == AppRoutes.splash;
-  return switch (authState) {
-    AuthInitializing() => null,
-    AuthLoading() => null,
-    AuthUnauthenticated() => onAuthFlow ? null : AppRoutes.login,
-    Authenticated() ||
-    AuthGuest() => (onAuthFlow || onSplash) ? AppRoutes.home : null,
-  };
+  final onOnboarding = location == AppRoutes.onboarding ||
+      location.startsWith('${AppRoutes.onboarding}/');
+
+  if (authState is AuthInitializing || authState is AuthLoading) return null;
+
+  if (authState is AuthUnauthenticated) {
+    return onAuthFlow ? null : AppRoutes.login;
+  }
+
+  // Authenticated or AuthGuest
+  final isComplete = onboardingComplete.asData?.value;
+  if (isComplete == null) return null; // still loading — stay put
+
+  if (onAuthFlow || onSplash) {
+    return isComplete ? AppRoutes.home : AppRoutes.onboarding;
+  }
+  if (onOnboarding) {
+    return isComplete ? AppRoutes.home : null;
+  }
+  return null;
 }
 
 // ── Router provider ───────────────────────────────────────────────────────────
 
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
-  // A ChangeNotifier that fires whenever the auth state changes.
-  // GoRouter re-evaluates `redirect` on every notification.
-  // Initialise to a safe sentinel; fireImmediately: true on the listener
-  // below will synchronously update it to the actual current value before
-  // the first redirect evaluation, eliminating the TOCTOU gap that would
-  // exist between a ref.read snapshot and a subsequent ref.listen setup.
+  // ValueNotifiers for auth and onboarding state. Both are updated via
+  // ref.listen (fireImmediately: true) so they are always in sync before
+  // the first redirect evaluation.
   final authListenable = ValueNotifier<AuthState>(
     const AuthState.initializing(),
   );
+  final onboardingListenable = ValueNotifier<AsyncValue<bool>>(
+    const AsyncLoading(),
+  );
+
   ref.listen<AuthState>(
     authProvider,
     (_, next) => authListenable.value = next,
     fireImmediately: true,
   );
-  ref.onDispose(authListenable.dispose);
+  ref.listen<AsyncValue<bool>>(
+    onboardingCompleteProvider,
+    (_, next) => onboardingListenable.value = next,
+    fireImmediately: true,
+  );
+
+  ref.onDispose(() {
+    authListenable.dispose();
+    onboardingListenable.dispose();
+  });
 
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: AppRoutes.splash,
-    refreshListenable: authListenable,
+    refreshListenable: Listenable.merge([authListenable, onboardingListenable]),
     redirect: (context, routerState) {
-      // Read from authListenable.value — it is always in sync with
-      // authProvider because ref.listen updates it before GoRouter fires
-      // this redirect. This avoids going back through ref.read and makes
-      // the coupling explicit.
       return resolveAuthRedirect(
         authListenable.value,
+        onboardingListenable.value,
         routerState.matchedLocation,
       );
     },
@@ -105,6 +132,12 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.splash,
         builder: (context, state) => const SplashScreen(),
+      ),
+
+      // ── First-launch onboarding (full-screen, no bottom nav) ────────────
+      GoRoute(
+        path: AppRoutes.onboarding,
+        builder: (context, state) => const OnboardingFlow(),
       ),
       GoRoute(
         path: AppRoutes.login,
