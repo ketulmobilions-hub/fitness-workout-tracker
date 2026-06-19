@@ -28,7 +28,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fitness Tracker'),
+        title: const Text('IronLog'),
         actions: [
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),

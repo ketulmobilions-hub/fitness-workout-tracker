@@ -1,6 +1,6 @@
 import 'package:fitness_domain/fitness_domain.dart';
 import 'package:flutter/material.dart';
-import 'package:fitness_workout_tracker/features/workout_plans/presentation/widgets/plan_exercise_item.dart';
+import 'package:ironlog/features/workout_plans/presentation/widgets/plan_exercise_item.dart';
 
 // 0-based JS convention: 0=Sun, 1=Mon, …, 6=Sat — matches server schema
 // (plan.routes.ts: dayOfWeek z.number().int().min(0).max(6)).

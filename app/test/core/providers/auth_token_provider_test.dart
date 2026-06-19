@@ -1,5 +1,5 @@
-import 'package:fitness_workout_tracker/core/providers/auth_token_provider.dart';
-import 'package:fitness_workout_tracker/core/providers/flutter_secure_storage_provider.dart';
+import 'package:ironlog/core/providers/auth_token_provider.dart';
+import 'package:ironlog/core/providers/flutter_secure_storage_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';

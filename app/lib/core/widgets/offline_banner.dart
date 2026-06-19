@@ -6,7 +6,7 @@ import '../providers/connectivity_provider.dart';
 /// Full-width banner shown at the top of every screen when the device has no
 /// network connection. Animates in and out as connectivity changes.
 ///
-/// Mounted via [MaterialApp.router]'s `builder:` parameter in [FitnessApp] so
+/// Mounted via [MaterialApp.router]'s `builder:` parameter in [IronLogApp] so
 /// it appears globally without any per-screen wiring.
 class OfflineBanner extends ConsumerWidget {
   const OfflineBanner({super.key});

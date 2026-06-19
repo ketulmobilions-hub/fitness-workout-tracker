@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:fitness_workout_tracker/core/network/refresh_interceptor.dart';
+import 'package:ironlog/core/network/refresh_interceptor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // ---------------------------------------------------------------------------
