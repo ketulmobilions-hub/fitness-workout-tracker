@@ -1,7 +1,7 @@
 import 'package:fitness_domain/fitness_domain.dart';
-import 'package:fitness_workout_tracker/core/router/app_router.dart';
-import 'package:fitness_workout_tracker/core/router/app_routes.dart';
-import 'package:fitness_workout_tracker/features/auth/providers/auth_state.dart';
+import 'package:ironlog/core/router/app_router.dart';
+import 'package:ironlog/core/router/app_routes.dart';
+import 'package:ironlog/features/auth/providers/auth_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

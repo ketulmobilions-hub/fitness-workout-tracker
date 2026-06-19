@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fitness_workout_tracker/app.dart';
+import 'package:ironlog/app.dart';
 
 void main() {
-  testWidgets('FitnessApp renders splash screen while auth initializes',
+  testWidgets('IronLogApp renders splash screen while auth initializes',
       (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: FitnessApp(),
+        child: IronLogApp(),
       ),
     );
 

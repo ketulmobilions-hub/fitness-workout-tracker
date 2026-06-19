@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:fitness_workout_tracker/core/network/auth_interceptor.dart';
-import 'package:fitness_workout_tracker/core/providers/auth_token_provider.dart';
+import 'package:ironlog/core/network/auth_interceptor.dart';
+import 'package:ironlog/core/providers/auth_token_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// ```dart
 /// const ProviderScope(
 ///   observers: [AppProviderObserver()],
-///   child: FitnessApp(),
+///   child: IronLogApp(),
 /// )
 /// ```
 base class AppProviderObserver extends ProviderObserver {

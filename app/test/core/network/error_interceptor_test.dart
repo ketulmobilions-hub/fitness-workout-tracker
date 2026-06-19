@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:fitness_workout_tracker/core/errors/app_exception.dart';
-import 'package:fitness_workout_tracker/core/network/error_interceptor.dart';
+import 'package:ironlog/core/errors/app_exception.dart';
+import 'package:ironlog/core/network/error_interceptor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -8,14 +8,26 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Scaffold(
+      backgroundColor: cs.surface,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.fitness_center, size: 72),
-            SizedBox(height: 24),
-            CircularProgressIndicator(),
+            Icon(Icons.fitness_center, size: 72, color: cs.primary),
+            const SizedBox(height: 16),
+            Text(
+              'IronLog',
+              style: tt.headlineLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cs.primary,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 48),
+            CircularProgressIndicator(color: cs.primary),
           ],
         ),
       ),

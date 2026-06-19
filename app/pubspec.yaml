@@ -1,5 +1,5 @@
-name: fitness_workout_tracker
-description: "Fitness & workout tracker app with custom plans, exercise logging, and progress tracking."
+name: ironlog
+description: "IronLog — powerlifting meet tracker with attempt logging, competition history, and strength scores."
 publish_to: 'none'
 version: '0.1.0+1'
 
@@ -43,6 +43,9 @@ dependencies:
 
   # Charts
   fl_chart: ^0.70.0
+
+  # Fonts
+  google_fonts: ^6.2.1
 
   # Local packages
   fitness_data:

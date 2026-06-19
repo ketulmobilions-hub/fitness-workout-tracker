@@ -9,7 +9,7 @@ void main() {
   runApp(
     const ProviderScope(
       observers: [AppProviderObserver()],
-      child: FitnessApp(),
+      child: IronLogApp(),
     ),
   );
 }
