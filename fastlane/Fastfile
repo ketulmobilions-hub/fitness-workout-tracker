@@ -1,0 +1,119 @@
+default_platform(:ios)
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+FLUTTER = "fvm flutter"
+APP_DIR  = File.expand_path("../app", __dir__)
+
+def flutter(*args)
+  sh("cd #{APP_DIR} && #{FLUTTER} #{args.join(' ')}")
+end
+
+# ---------------------------------------------------------------------------
+# iOS
+# ---------------------------------------------------------------------------
+
+platform :ios do
+  # Run Flutter screenshot integration tests on the target simulator and collect
+  # the resulting PNGs into fastlane/screenshots/ios/.
+  #
+  # Usage:
+  #   bundle exec fastlane ios screenshots
+  #   bundle exec fastlane ios screenshots device:"iPhone 16 Pro Max"
+  lane :screenshots do |options|
+    device = options[:device] || "iPhone 16 Pro Max"
+
+    # Ensure output directory exists.
+    sh("mkdir -p #{File.expand_path('../screenshots/ios', __dir__)}")
+
+    flutter(
+      "drive",
+      "--driver=test_driver/integration_test.dart",
+      "--target=integration_test/screenshot_test.dart",
+      "-d '#{device}'",
+      "--dart-define=SCREENSHOT_MODE=true",
+    )
+
+    # Flutter drive writes screenshots to build/ios_results/<name>.png.
+    # Copy them into the standard Fastlane location.
+    results_dir = "#{APP_DIR}/build/ios_results"
+    out_dir     = File.expand_path("../screenshots/ios", __dir__)
+
+    if Dir.exist?(results_dir)
+      Dir.glob("#{results_dir}/*.png").each do |f|
+        FileUtils.cp(f, out_dir)
+        UI.success "Copied #{File.basename(f)} → screenshots/ios/"
+      end
+    else
+      UI.important "No screenshots found in #{results_dir}. " \
+                   "Run on a real device or simulator with the correct Flutter drive flags."
+    end
+  end
+
+  # Upload metadata + screenshots to App Store Connect.
+  # Run `screenshots` first so fastlane/screenshots/ios/ is populated.
+  #
+  # Usage:
+  #   bundle exec fastlane ios upload_metadata
+  lane :upload_metadata do
+    deliver(
+      submit_for_review:        false,
+      automatic_release:        false,
+      force:                    true,   # skip HTML preview
+      skip_binary_upload:       true,
+      skip_screenshots:         false,
+      screenshots_path:         "screenshots/ios",
+      metadata_path:            "metadata/ios",
+      languages:                ["en-US"],
+      app_version:              flutter_version_name,
+    )
+  end
+
+  # Helper — parses the version name from pubspec.yaml without shelling out.
+  def flutter_version_name
+    pubspec = File.read("#{APP_DIR}/pubspec.yaml")
+    pubspec.match(/^version:\s*(\d+\.\d+\.\d+)/)[1]
+  end
+end
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+
+platform :android do
+  lane :screenshots do |options|
+    device_serial = options[:serial] # e.g. "emulator-5554"
+
+    sh("mkdir -p #{File.expand_path('../screenshots/android', __dir__)}")
+
+    cmd = "#{FLUTTER} drive " \
+          "--driver=test_driver/integration_test.dart " \
+          "--target=integration_test/screenshot_test.dart " \
+          "--dart-define=SCREENSHOT_MODE=true"
+    cmd += " -d #{device_serial}" if device_serial
+    sh("cd #{APP_DIR} && #{cmd}")
+
+    results_dir = "#{APP_DIR}/build/android_results"
+    out_dir     = File.expand_path("../screenshots/android", __dir__)
+
+    if Dir.exist?(results_dir)
+      Dir.glob("#{results_dir}/*.png").each do |f|
+        FileUtils.cp(f, out_dir)
+        UI.success "Copied #{File.basename(f)} → screenshots/android/"
+      end
+    end
+  end
+
+  lane :upload_metadata do
+    supply(
+      track:               "internal",
+      skip_upload_apk:     true,
+      skip_upload_aab:     true,
+      skip_upload_images:  false,
+      metadata_path:       "metadata/android",
+      screenshots_path:    "screenshots/android",
+    )
+  end
+end

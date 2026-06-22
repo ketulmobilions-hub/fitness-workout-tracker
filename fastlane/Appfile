@@ -1,0 +1,5 @@
+app_identifier("com.ironlog.app")
+apple_id("mobilionsteam@gmail.com")
+
+itc_team_id("") # App Store Connect Team ID — fill in after first upload
+team_id("")     # Developer Portal Team ID — fill in after first upload

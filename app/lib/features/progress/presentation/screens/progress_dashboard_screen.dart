@@ -51,6 +51,7 @@ class _ProgressDashboardScreenState
     return Scaffold(
       appBar: AppBar(title: const Text('Progress')),
       floatingActionButton: FloatingActionButton.extended(
+        key: const Key('oneRmCalcFab'),
         onPressed: () => showModalBottomSheet<void>(
           context: context,
           isScrollControlled: true,

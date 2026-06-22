@@ -1,0 +1,32 @@
+The powerlifting tracker built for serious strength athletes.
+
+Log every squat, bench, and deadlift with RPE-based tracking that actually speaks your language. IronLog is built from the ground up for powerlifting — not adapted from a generic fitness app.
+
+TRACK WHAT MATTERS
+• Log sets with weight, reps, RPE, and tempo in seconds
+• Auto-calculate estimated 1RM using Epley, Brzycki, and Lombardi formulas
+• Track your SBD training total and watch it climb across every block
+• Volume zone analysis: submaximal, near-maximal, and maximal intensity breakdown
+
+COMPETITION-READY
+• Meet Day mode: attempt selection grid for all nine SBD attempts
+• Log meet results with Wilks, Dots, and IPF GL scores calculated automatically
+• Competition history with trend charts and Wilks/Dots trajectory across every meet
+• Weight class tracking for IPF, USAPL, CPU, and other major federations
+
+SMART PROGRAMMING
+• Built-in templates: 5/3/1 BBB, GZCLP, SBS Hypertrophy, Juggernaut Method
+• Multi-week program calendar with deload week markers
+• Previous session display while logging — see exactly what you hit last time
+• Suggested weights based on your 1RM percentage targets
+
+SHARE YOUR MILESTONES
+• Auto-generated PR cards for Instagram, TikTok, and Stories
+• Cards include exercise, weight, estimated 1RM, and RPE
+• Share or save directly to Photos with one tap
+
+BUILT FOR THE LONG GAME
+• Offline-first: log workouts with zero internet required
+• Streak tracking keeps you consistent between meets
+• Full workout history with session replay and volume trends
+• Apple Health integration for automatic step and heart rate sync
