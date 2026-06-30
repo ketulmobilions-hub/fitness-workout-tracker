@@ -18,6 +18,13 @@ npm run lint                  # ESLint
 npm run lint:fix              # ESLint with auto-fix
 npm run format:check          # Prettier check
 
+# Tests (Vitest)
+npm test                      # vitest run (all tests once)
+npm run test:watch            # vitest watch mode
+npm run test:coverage         # with coverage
+npx vitest run src/test/unit/<file>.test.ts # single file (tests in src/test/{unit,integration}/)
+npx vitest run -t "logs in with google"     # single test by name
+
 # Database
 npm run db:migrate            # Run migrations (dev — creates migration files)
 npm run db:migrate:prod       # Deploy migrations (production)
@@ -52,23 +59,27 @@ cd packages/fitness_domain && flutter pub get
 
 Fitness & workout tracker app — custom workout plans, exercise logging, progress photos, streak tracking, social sharing, and health API integration. Freemium model, solo developer.
 
+**Current product direction: IronLog** — rebranded toward a powerlifting focus (gold/dark theme, powerlifting onboarding). Shipped powerlifting features beyond the original MVP: competition/meet-day mode, attempt calculator, competition history, training-max tracking, volume/zone analysis, PR share cards. Treat the generic "fitness tracker" framing below as the foundation; the live app is the powerlifting-oriented IronLog built on top of it.
+
 ## Tech Stack
 
-### Frontend: Flutter
-- **State management:** Riverpod + riverpod_generator (NOT Bloc)
-- **Data classes:** Freezed + json_serializable
+### Frontend: Flutter (Riverpod 3)
+- **State management:** Riverpod 3 + riverpod_generator (NOT Bloc)
+- **Routing:** go_router (NOT auto_route)
+- **Data classes:** Freezed 3 + json_serializable
 - **Local DB:** Drift (SQLite) — mirrors PostgreSQL schema for offline-first
 - **HTTP:** Dio + Retrofit (typed API clients)
-- **Notifications:** firebase_messaging
-- **Health:** `health` package (Apple Health + Google Fit)
+- **Notifications:** firebase_messaging (planned)
+- **Health:** `health` package (Apple Health + Google Fit) (planned)
 
 ### Backend: Node.js + TypeScript
-- **Framework:** Express
-- **ORM:** Prisma (schema-first, manages migrations)
-- **Auth:** JWT + Passport.js (email/password, Google, Apple, guest mode)
-- **Real-time:** Socket.IO
-- **Background jobs:** BullMQ
-- **Validation:** Zod
+- **Framework:** Express 5
+- **ORM:** Prisma 7 (schema-first, manages migrations; uses `@prisma/adapter-pg` driver adapter)
+- **Auth:** custom JWT — `jsonwebtoken` + `bcryptjs` + `google-auth-library` + `apple-signin-auth` (email/password, Google, Apple, guest mode). NOT Passport.js.
+- **Background jobs:** BullMQ (on `ioredis`)
+- **Validation:** Zod 4
+- **Email:** nodemailer
+- **Real-time:** Socket.IO is planned (Phase 3) — not yet wired in.
 
 ### Infrastructure
 - **Database:** PostgreSQL (primary) + Redis (cache/real-time)
@@ -121,10 +132,32 @@ Riverpod replaces BLoC in the VGV pattern. Providers manage immutable state, rea
 ### Monorepo Layout
 ```
 /
-├── app/          # Flutter app
-│   └── packages/ # Separate Dart packages (data layer, domain layer)
-└── server/       # Node.js + Express API
+├── app/                    # Flutter app
+│   ├── lib/
+│   │   ├── core/           # Cross-cutting (theme, router, config)
+│   │   ├── shared/         # Shared widgets/utils
+│   │   └── features/       # Feature-based folders (see below)
+│   ├── integration_test/   # Flutter integration tests
+│   └── packages/
+│       ├── fitness_data/   # Data layer (API, Drift, device APIs)
+│       └── fitness_domain/ # Domain layer (models, business rules)
+├── server/
+│   └── src/
+│       ├── routes/         # Express route definitions
+│       ├── controllers/    # Request handlers
+│       ├── services/       # Business logic
+│       ├── schemas/        # Zod validation schemas
+│       ├── middleware/     # Auth, error handling, rate limiting
+│       ├── queues/ jobs/ workers/  # BullMQ background jobs
+│       ├── data/ lib/ utils/ types/ generated/
+│       └── test/           # Vitest tests
+├── docs/                   # technical-architecture, QA test plans, scenarios
+└── fastlane/               # App Store metadata + screenshot pipeline (Gemfile at root)
 ```
+
+**App features** (`app/lib/features/`): `auth`, `exercises`, `workout_plans`, `active_session`, `workout_history`, `progress`, `streak`, `profile`, `onboarding`, `competition`, `pr_share`.
+
+**Server routes** (`server/src/routes/`): `auth`, `user`, `exercise`, `muscle-group`, `reference`, `plan`, `session`, `progress`, `streak`, `competition`, `training-max`, `sync`, `health`.
 
 ### Offline-First Sync Pattern
 The app must work offline. Local changes are queued in Drift (SQLite), pushed to server when online, then server changes are pulled. Drift is the source of truth on the client; PostgreSQL is the source of truth on the server. **Conflict resolution: last-write-wins** (using `updated_at` timestamps).
@@ -249,7 +282,7 @@ Default limit: 20, max: 100. Use cursor-based pagination (not offset) for stable
 ### Backend (Extensive)
 - **Unit tests:** All service functions, validation, business logic, auth middleware
 - **Integration tests:** All API endpoints against real test database
-- Test framework: `jest` (or `vitest`), `supertest` for HTTP testing
+- Test framework: **Vitest** (`npm test` = `vitest run`, `npm run test:watch`, `npm run test:coverage`). Tests live in `server/src/test/`.
 
 ## CI/CD
 
