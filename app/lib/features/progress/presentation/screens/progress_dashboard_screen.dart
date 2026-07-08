@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../shared/widgets/guest_feature_gate.dart';
+import '../../../auth/providers/auth_notifier.dart';
+import '../../../auth/providers/auth_state.dart';
 import '../../../pr_share/pr_share.dart';
 import '../../../profile/providers/profile_providers.dart';
 import '../../../streak/providers/streak_providers.dart';
@@ -26,6 +29,21 @@ class _ProgressDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    // Progress is gated to full accounts server-side (requireFullAccount → 403).
+    // Short-circuit for guests before watching any progress provider, so the
+    // forbidden endpoints are never called.
+    if (ref.watch(authProvider) is AuthGuest) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Progress')),
+        body: const GuestFeatureGate(
+          icon: Icons.insights_outlined,
+          title: 'Progress is a member feature',
+          message:
+              'Create a free account to track your lifts, PRs, and volume over time.',
+        ),
+      );
+    }
+
     final overviewAsync = ref.watch(progressOverviewProvider);
     final recordsAsync = ref.watch(personalRecordsProvider);
     final volumeAsync = ref.watch(
