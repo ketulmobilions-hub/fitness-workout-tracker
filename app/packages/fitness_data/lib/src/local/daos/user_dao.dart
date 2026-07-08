@@ -30,6 +30,17 @@ class UserDao extends DatabaseAccessor<AppDatabase> with _$UserDaoMixin {
     return into(users).insertOnConflictUpdate(toWrite);
   }
 
+  /// Partial UPDATE for an existing user row. Unlike [upsertUser], this emits
+  /// a plain UPDATE statement, so companions that omit NOT NULL columns (e.g.
+  /// auth_provider) do not trigger a constraint failure. No-ops (returns 0) if
+  /// the row does not exist. Stamps updatedAt when the caller omits it.
+  Future<int> updateUserFields(String id, UsersCompanion companion) {
+    final toWrite = companion.updatedAt.present
+        ? companion
+        : companion.copyWith(updatedAt: Value(DateTime.now()));
+    return (update(users)..where((t) => t.id.equals(id))).write(toWrite);
+  }
+
   Future<int> deleteUser(String id) {
     return (delete(users)..where((t) => t.id.equals(id))).go();
   }

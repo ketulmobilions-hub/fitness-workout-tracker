@@ -13,11 +13,11 @@ class ProfileRepositoryImpl implements ProfileRepository {
     required data.SyncQueueDao syncQueueDao,
     required String userId,
     required Future<void> Function() clearTokens,
-  })  : _apiClient = apiClient,
-        _userDao = userDao,
-        _syncDao = syncQueueDao,
-        _userId = userId,
-        _clearTokens = clearTokens;
+  }) : _apiClient = apiClient,
+       _userDao = userDao,
+       _syncDao = syncQueueDao,
+       _userId = userId,
+       _clearTokens = clearTokens;
 
   final data.UserApiClient _apiClient;
   final data.UserDao _userDao;
@@ -83,15 +83,22 @@ class ProfileRepositoryImpl implements ProfileRepository {
     String? gender,
   }) async {
     // Optimistic local write so UI reflects the change immediately.
-    await _userDao.upsertUser(data.UsersCompanion(
-      id: Value(_userId),
-      federation: Value(federation),
-      division: Value(division),
-      weightClassKg: Value(weightClassKg),
-      bodyweightKg: Value(bodyweightKg),
-      gender: Value(gender),
-      updatedAt: Value(DateTime.now()),
-    ));
+    // Use a plain UPDATE (not upsert): this partial companion omits the
+    // NOT NULL auth_provider column, which would fail the constraint on the
+    // INSERT branch of an upsert even when the row already exists. A no-op
+    // when the row is missing — the server response below then populates the
+    // full row via _dtoToCompanion.
+    await _userDao.updateUserFields(
+      _userId,
+      data.UsersCompanion(
+        federation: Value(federation),
+        division: Value(division),
+        weightClassKg: Value(weightClassKg),
+        bodyweightKg: Value(bodyweightKg),
+        gender: Value(gender),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
 
     try {
       final envelope = await _apiClient.updateCompetitionProfile(
@@ -109,7 +116,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
       if (row == null) throw Exception('Profile not found after save');
       return _rowToProfile(row);
     } catch (e) {
-      debugPrint('ProfileRepository: competition update server sync failed: $e');
+      debugPrint(
+        'ProfileRepository: competition update server sync failed: $e',
+      );
       await enqueueSyncItem(
         dao: _syncDao,
         userId: _userId,
@@ -230,7 +239,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
     final prefsMap = row.preferences;
     return UserProfile(
       id: row.id,
-      email: row.email.startsWith('guest:') ? null : row.email,
+      email: row.email,
       displayName: row.displayName,
       avatarUrl: row.avatarUrl,
       bio: row.bio,
@@ -250,7 +259,7 @@ class ProfileRepositoryImpl implements ProfileRepository {
   data.UsersCompanion _dtoToCompanion(data.ProfileResponseDto dto) {
     return data.UsersCompanion(
       id: Value(dto.id),
-      email: Value(dto.email ?? 'guest:${dto.id}'),
+      email: Value(dto.email),
       displayName: Value(dto.displayName),
       avatarUrl: Value(dto.avatarUrl),
       bio: Value(dto.bio),
@@ -375,7 +384,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
       // Surface a clear human-readable message instead of the raw HTTP error.
       if (e.response?.statusCode == 403) {
         throw Exception(
-            'This action requires a full account. Please sign up to continue.');
+          'This action requires a full account. Please sign up to continue.',
+        );
       }
       if (e.response?.statusCode == 401) {
         throw Exception('Your session has expired. Please log in again.');
