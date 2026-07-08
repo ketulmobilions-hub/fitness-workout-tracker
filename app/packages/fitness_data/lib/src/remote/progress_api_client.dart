@@ -9,36 +9,36 @@ part 'progress_api_client.g.dart';
 abstract class ProgressApiClient {
   factory ProgressApiClient(Dio dio) = _ProgressApiClient;
 
-  @GET('/api/v1/progress/overview')
+  @GET('/progress/overview')
   Future<ProgressOverviewEnvelopeDto> getOverview({
     @Query('utc_offset') required int utcOffset,
   });
 
-  @GET('/api/v1/progress/exercise/{id}')
+  @GET('/progress/exercise/{id}')
   Future<ExerciseProgressEnvelopeDto> getExerciseProgress(
     @Path('id') String id, {
     @Query('period') required String period,
   });
 
-  @GET('/api/v1/progress/personal-records')
+  @GET('/progress/personal-records')
   Future<PersonalRecordsEnvelopeDto> getPersonalRecords({
     @Query('exercise_id') String? exerciseId,
     @Query('record_type') String? recordType,
   });
 
-  @GET('/api/v1/progress/volume')
+  @GET('/progress/volume')
   Future<VolumeEnvelopeDto> getVolume({
     @Query('period') required String period,
     @Query('granularity') String? granularity,
   });
 
-  @GET('/api/v1/progress/sbd-total')
+  @GET('/progress/sbd-total')
   Future<SbdTotalEnvelopeDto> getSbdTotal();
 
-  @GET('/api/v1/progress/strength-scores/history')
+  @GET('/progress/strength-scores/history')
   Future<ScoreHistoryEnvelopeDto> getStrengthScoreHistory();
 
-  @GET('/api/v1/progress/volume-zones')
+  @GET('/progress/volume-zones')
   Future<VolumeZoneEnvelopeDto> getVolumeZones({
     @Query('weeks') int? weeks,
     @Query('utc_offset') required int utcOffset,

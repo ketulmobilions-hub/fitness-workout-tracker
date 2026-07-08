@@ -74,7 +74,7 @@ class AuthNotifier extends _$AuthNotifier {
       }
       final user = AuthUser(
         id: userRow.id,
-        email: userRow.email.startsWith('guest:') ? null : userRow.email,
+        email: userRow.email,
         displayName: userRow.displayName,
         isGuest: userRow.isGuest,
       );
@@ -94,10 +94,7 @@ class AuthNotifier extends _$AuthNotifier {
     if (_isLive(generation)) state = s;
   }
 
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> login({required String email, required String password}) async {
     final previous = state;
     state = const AuthState.loading();
     try {
@@ -127,11 +124,9 @@ class AuthNotifier extends _$AuthNotifier {
     final previous = state;
     state = const AuthState.loading();
     try {
-      final user = await ref.read(authRepositoryProvider).register(
-            email: email,
-            password: password,
-            displayName: displayName,
-          );
+      final user = await ref
+          .read(authRepositoryProvider)
+          .register(email: email, password: password, displayName: displayName);
       _generation++;
       state = AuthState.authenticated(user: user);
     } on CancelledException {

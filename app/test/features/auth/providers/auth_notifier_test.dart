@@ -60,7 +60,7 @@ String _fakeJwt(String sub, {bool isGuest = false}) {
 /// returns it. The caller is responsible for calling [AppDatabase.close].
 Future<AppDatabase> _makeSeededDb({
   required String id,
-  required String email,
+  String? email,
   String? displayName,
   AuthProvider provider = AuthProvider.emailPassword,
   bool isGuest = false,
@@ -69,7 +69,7 @@ Future<AppDatabase> _makeSeededDb({
   await db.userDao.upsertUser(
     UsersCompanion.insert(
       id: id,
-      email: email,
+      email: Value(email),
       displayName: Value(displayName),
       authProvider: provider,
       isGuest: Value(isGuest),
@@ -167,7 +167,7 @@ void main() {
     test('restores guest state for a guest account', () async {
       final db = await _makeSeededDb(
         id: 'guest-456',
-        email: 'guest:guest-456',
+        email: null,
         displayName: 'Guest',
         provider: AuthProvider.guest,
         isGuest: true,

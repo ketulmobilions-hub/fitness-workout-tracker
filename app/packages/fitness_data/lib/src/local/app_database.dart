@@ -71,7 +71,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -156,6 +156,12 @@ class AppDatabase extends _$AppDatabase {
               ),
             },
           ));
+        }
+        if (from < 9) {
+          // Make email nullable to match the server schema — guest accounts
+          // are created without an email. Drift requires a full TableMigration
+          // (table recreate + copy) to change column nullability in SQLite.
+          await m.alterTable(TableMigration(users));
         }
       },
     );

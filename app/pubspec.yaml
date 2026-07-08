@@ -40,6 +40,8 @@ dependencies:
 
   # Drift (needed for UsersCompanion Value<T> wrapper in repository impl)
   drift: ^2.22.1
+  # sqlite3 — SqliteException type used to map local DB failures to AppException
+  sqlite3: ^2.4.0
 
   # Charts
   fl_chart: ^0.70.0

@@ -73,6 +73,7 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
             unauthorized: (_) => 'Session expired. Please log in again.',
             serverError: (_, m) => m ?? 'Server error. Please try again.',
             validation: (m, _) => m ?? 'Validation error.',
+            database: (_) => "Couldn't save on this device. Please try again.",
             cancelled: () => null,
             unknown: (m) => m ?? 'An unexpected error occurred.',
           );
@@ -174,6 +175,7 @@ class _PlanFormScreenState extends ConsumerState<PlanFormScreen> {
                   network: (_) => 'No network. Check your connection.',
                   unauthorized: (_) => 'Session expired.',
                   serverError: (_, m) => m ?? 'Server error.',
+                  database: (_) => "Couldn't save on this device.",
                   cancelled: () => '',
                   unknown: (m) => m ?? 'An unexpected error occurred.',
                 ),

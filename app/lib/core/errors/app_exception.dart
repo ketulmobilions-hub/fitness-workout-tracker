@@ -30,6 +30,10 @@ sealed class AppException with _$AppException implements Exception {
   /// Not an error — callers should silently ignore this.
   const factory AppException.cancelled() = CancelledException;
 
+  /// Local persistence failure (Drift / SQLite), e.g. a constraint violation
+  /// or disk error while reading or writing the on-device database.
+  const factory AppException.database({String? message}) = DatabaseException;
+
   /// Catch-all for unexpected errors.
   const factory AppException.unknown({String? message}) = UnknownException;
 }

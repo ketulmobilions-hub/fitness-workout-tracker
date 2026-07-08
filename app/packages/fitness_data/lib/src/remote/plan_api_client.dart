@@ -15,37 +15,37 @@ abstract class PlanApiClient {
   // Read
   // -------------------------------------------------------------------------
 
-  @GET('/api/v1/plans')
+  @GET('/plans')
   Future<PlanListEnvelopeDto> listPlans({
     @Query('cursor') String? cursor,
     @Query('limit') int? limit,
   });
 
-  @GET('/api/v1/plans/{id}')
+  @GET('/plans/{id}')
   Future<PlanDetailEnvelopeDto> getPlan(@Path('id') String id);
 
   // -------------------------------------------------------------------------
   // Write — plan metadata
   // -------------------------------------------------------------------------
 
-  @POST('/api/v1/plans')
+  @POST('/plans')
   Future<PlanDetailEnvelopeDto> createPlan(
       @Body() CreatePlanRequestDto body);
 
-  @PATCH('/api/v1/plans/{id}')
+  @PATCH('/plans/{id}')
   Future<PlanDetailEnvelopeDto> updatePlan(
     @Path('id') String id,
     @Body() UpdatePlanRequestDto body,
   );
 
-  @DELETE('/api/v1/plans/{id}')
+  @DELETE('/plans/{id}')
   Future<void> deletePlan(@Path('id') String id);
 
   // -------------------------------------------------------------------------
   // Write — plan day metadata (isDeload, name)
   // -------------------------------------------------------------------------
 
-  @PATCH('/api/v1/plans/{planId}/days/{dayId}')
+  @PATCH('/plans/{planId}/days/{dayId}')
   Future<PlanDayUpdateEnvelopeDto> updatePlanDay(
     @Path('planId') String planId,
     @Path('dayId') String dayId,
@@ -56,26 +56,26 @@ abstract class PlanApiClient {
   // Write — exercises within a plan day
   // -------------------------------------------------------------------------
 
-  @POST('/api/v1/plans/{id}/exercises')
+  @POST('/plans/{id}/exercises')
   Future<PlanDetailEnvelopeDto> addExercise(
     @Path('id') String planId,
     @Body() AddPlanExerciseRequestDto body,
   );
 
-  @PATCH('/api/v1/plans/{id}/exercises/{exId}')
+  @PATCH('/plans/{id}/exercises/{exId}')
   Future<PlanDetailEnvelopeDto> updateExercise(
     @Path('id') String planId,
     @Path('exId') String exerciseId,
     @Body() UpdatePlanExerciseRequestDto body,
   );
 
-  @DELETE('/api/v1/plans/{id}/exercises/{exId}')
+  @DELETE('/plans/{id}/exercises/{exId}')
   Future<void> deleteExercise(
     @Path('id') String planId,
     @Path('exId') String exerciseId,
   );
 
-  @PATCH('/api/v1/plans/{id}/exercises/reorder')
+  @PATCH('/plans/{id}/exercises/reorder')
   Future<void> reorderExercises(
     @Path('id') String planId,
     @Body() ReorderPlanExercisesRequestDto body,
@@ -85,17 +85,17 @@ abstract class PlanApiClient {
   // Templates
   // -------------------------------------------------------------------------
 
-  @GET('/api/v1/plans/templates')
+  @GET('/plans/templates')
   Future<TemplateListEnvelopeDto> listTemplates({
     @Query('category') String? category,
   });
 
-  @GET('/api/v1/plans/templates/{templateId}')
+  @GET('/plans/templates/{templateId}')
   Future<TemplateDetailEnvelopeDto> getTemplate(
     @Path('templateId') String templateId,
   );
 
-  @POST('/api/v1/plans/templates/{templateId}/import')
+  @POST('/plans/templates/{templateId}/import')
   Future<PlanDetailEnvelopeDto> importTemplate(
     @Path('templateId') String templateId,
     @Body() ImportTemplateRequestDto body,
