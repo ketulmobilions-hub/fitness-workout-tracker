@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../shared/widgets/guest_feature_gate.dart';
+import '../../../auth/providers/auth_notifier.dart';
+import '../../../auth/providers/auth_state.dart';
 import '../../providers/plan_list_provider.dart';
 import '../widgets/plan_card.dart';
 
@@ -11,6 +14,22 @@ class PlanListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Every plan route (create, list, templates) is gated to full accounts
+    // server-side (requireFullAccount → 403). A guest can create nothing and
+    // has no plans, so show the upgrade gate up front rather than letting them
+    // build a whole plan only to fail on save.
+    if (ref.watch(authProvider) is AuthGuest) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('My Plans')),
+        body: const GuestFeatureGate(
+          icon: Icons.event_note_outlined,
+          title: 'Plans are a member feature',
+          message:
+              'Create a free account to build workout plans and follow them.',
+        ),
+      );
+    }
+
     final plansAsync = ref.watch(planListProvider);
 
     return Scaffold(

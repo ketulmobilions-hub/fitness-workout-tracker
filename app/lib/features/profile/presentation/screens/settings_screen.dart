@@ -9,6 +9,7 @@ import '../../../auth/providers/auth_notifier.dart';
 import '../../../auth/providers/auth_state.dart';
 import '../../../onboarding/providers/first_launch_provider.dart';
 import '../../../onboarding/providers/onboarding_notifier.dart';
+import '../../../../shared/widgets/guest_feature_gate.dart';
 import '../../../workout_plans/providers/workout_plan_providers.dart';
 import '../../providers/profile_providers.dart';
 import '../widgets/guest_upgrade_card.dart';
@@ -193,17 +194,31 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.fitness_center),
             title: const Text('Training Maxes'),
             subtitle: const Text('Set % of 1RM baselines for programs'),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const TrainingMaxScreen(),
-              ),
-            ),
+            onTap: () => isGuest
+                ? showGuestUpgradePrompt(
+                    context,
+                    title: 'Training maxes need an account',
+                    message:
+                        'Create a free account to save your training maxes.',
+                  )
+                : Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const TrainingMaxScreen(),
+                    ),
+                  ),
           ),
           ListTile(
             leading: const Icon(Icons.emoji_events_outlined),
             title: const Text('Start Meet'),
             subtitle: const Text('Enter meet day mode to track attempts'),
-            onTap: () => context.push(AppRoutes.startMeet),
+            onTap: () => isGuest
+                ? showGuestUpgradePrompt(
+                    context,
+                    title: 'Meet mode needs an account',
+                    message:
+                        'Create a free account to run meet day and track attempts.',
+                  )
+                : context.push(AppRoutes.startMeet),
           ),
           ListTile(
             leading: const Icon(Icons.tune_outlined),
