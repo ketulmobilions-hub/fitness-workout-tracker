@@ -39,6 +39,7 @@ export 'src/local/tables/workout_plan_tables.dart';
 export 'src/local/tables/workout_session_tables.dart';
 export 'src/local/tables/progress_tables.dart';
 export 'src/local/tables/sync_queue_table.dart';
+export 'src/local/tables/app_metadata_table.dart';
 
 // DAOs
 export 'src/local/daos/user_dao.dart';
@@ -47,6 +48,7 @@ export 'src/local/daos/workout_plan_dao.dart';
 export 'src/local/daos/workout_session_dao.dart';
 export 'src/local/daos/progress_dao.dart';
 export 'src/local/daos/sync_queue_dao.dart';
+export 'src/local/daos/app_metadata_dao.dart';
 
 // Enums and converters
 export 'src/local/converters/auth_provider_converter.dart';

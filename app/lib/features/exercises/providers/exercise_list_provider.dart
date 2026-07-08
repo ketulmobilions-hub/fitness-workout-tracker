@@ -12,7 +12,8 @@ class ExerciseList extends _$ExerciseList {
   // Guards against re-triggering sync on every build() call. build() is
   // re-invoked whenever any watched dependency changes (e.g. filter state on
   // every keystroke). The flag is reset when the notifier is disposed and
-  // re-created (e.g. navigating away and back), triggering a fresh sync.
+  // re-created (e.g. navigating away and back); the repository then throttles
+  // the actual network round-trip so revisits don't re-pull a fresh catalog.
   bool _hasSynced = false;
 
   @override
@@ -34,7 +35,8 @@ class ExerciseList extends _$ExerciseList {
   /// refresh does not kill the Drift stream (which still emits cached data).
   Future<void> refresh() async {
     try {
-      await ref.read(exerciseRepositoryProvider).syncExercises();
+      // Explicit user gesture — always sync, bypassing the freshness throttle.
+      await ref.read(exerciseRepositoryProvider).syncExercises(force: true);
     } catch (e) {
       // Sync failed (e.g. offline). The stream continues to emit cached data.
       // Swallowing here keeps RefreshIndicator's spinner from hanging; the

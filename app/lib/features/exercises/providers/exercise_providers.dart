@@ -18,6 +18,7 @@ ExerciseRepository exerciseRepository(Ref ref) {
   return ExerciseRepositoryImpl(
     apiClient: ref.watch(exerciseApiClientProvider),
     exerciseDao: ref.watch(appDatabaseProvider).exerciseDao,
+    metadataDao: ref.watch(appDatabaseProvider).appMetadataDao,
   );
 }
 
