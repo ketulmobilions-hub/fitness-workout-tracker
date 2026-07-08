@@ -6,11 +6,19 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
   ExerciseRepositoryImpl({
     required ExerciseApiClient apiClient,
     required ExerciseDao exerciseDao,
+    required AppMetadataDao metadataDao,
   })  : _apiClient = apiClient,
-        _exerciseDao = exerciseDao;
+        _exerciseDao = exerciseDao,
+        _metadataDao = metadataDao;
 
   final ExerciseApiClient _apiClient;
   final ExerciseDao _exerciseDao;
+  final AppMetadataDao _metadataDao;
+
+  /// How long a catalog sync stays "fresh" before a background open re-syncs.
+  /// The exercise catalog is near-static, so a day is plenty; an explicit
+  /// pull-to-refresh bypasses this via `force`.
+  static const Duration _syncTtl = Duration(hours: 24);
 
   // ---------------------------------------------------------------------------
   // Read — streams from local Drift DB (offline-first)
@@ -66,7 +74,12 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
   // ---------------------------------------------------------------------------
 
   @override
-  Future<void> syncExercises() async {
+  Future<void> syncExercises({bool force = false}) async {
+    // Throttle: skip the network round-trip when a recent sync succeeded,
+    // unless the caller forces it (explicit pull-to-refresh). The catalog is
+    // near-static, so re-pulling every screen open is wasteful.
+    if (!force && !await _isSyncStale()) return;
+
     // Phase 1: Network — collect all data without touching the DB.
     // This keeps the transaction short and avoids holding a DB lock during
     // potentially-slow network calls.
@@ -128,6 +141,25 @@ class ExerciseRepositoryImpl implements ExerciseRepository {
       // delete but before the local delete completed.
       await _exerciseDao.deleteSystemExercisesNotInSet(apiIds);
     });
+
+    // Record success so the next background open can throttle. Written after
+    // the transaction commits so a failed sync does not advance the timestamp.
+    await _metadataDao.setValue(
+      AppMetadataDao.exercisesLastSyncKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
+  }
+
+  /// True when there is no recorded successful sync, the stored timestamp is
+  /// unparseable, or the last sync is older than [_syncTtl].
+  Future<bool> _isSyncStale() async {
+    final raw = await _metadataDao.getValue(
+      AppMetadataDao.exercisesLastSyncKey,
+    );
+    if (raw == null) return true;
+    final last = DateTime.tryParse(raw);
+    if (last == null) return true;
+    return DateTime.now().toUtc().difference(last) >= _syncTtl;
   }
 
   // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import 'converters/schedule_type_converter.dart';
 import 'converters/session_status_converter.dart';
 import 'converters/streak_day_status_converter.dart';
 import 'converters/sync_operation_converter.dart';
+import 'daos/app_metadata_dao.dart';
 import 'daos/exercise_dao.dart';
 import 'daos/progress_dao.dart';
 import 'daos/sync_queue_dao.dart';
@@ -19,6 +20,7 @@ import 'daos/workout_plan_dao.dart';
 import 'daos/workout_session_dao.dart';
 import 'tables/exercise_library_tables.dart';
 import 'tables/progress_tables.dart';
+import 'tables/app_metadata_table.dart';
 import 'tables/sync_queue_table.dart';
 import 'tables/users_table.dart';
 import 'tables/workout_plan_tables.dart';
@@ -42,6 +44,7 @@ part 'app_database.g.dart';
     Streaks,
     StreakHistory,
     SyncQueue,
+    AppMetadata,
   ],
   daos: [
     UserDao,
@@ -50,6 +53,7 @@ part 'app_database.g.dart';
     WorkoutSessionDao,
     ProgressDao,
     SyncQueueDao,
+    AppMetadataDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -71,7 +75,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -162,6 +166,11 @@ class AppDatabase extends _$AppDatabase {
           // are created without an email. Drift requires a full TableMigration
           // (table recreate + copy) to change column nullability in SQLite.
           await m.alterTable(TableMigration(users));
+        }
+        if (from < 10) {
+          // Add the app_metadata key/value table (used to throttle the
+          // exercise-catalog sync via a persisted last-sync timestamp).
+          await m.createTable(appMetadata);
         }
       },
     );

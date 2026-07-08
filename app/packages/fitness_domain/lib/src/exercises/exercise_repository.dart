@@ -22,7 +22,11 @@ abstract class ExerciseRepository {
   /// Fetches all exercises and muscle groups from the API and upserts them into
   /// the local Drift database. All writes are wrapped in a single transaction
   /// so a mid-sync interruption cannot leave the DB in a partial state.
-  Future<void> syncExercises();
+  ///
+  /// Throttled: skips the network round-trip when the last successful sync was
+  /// recent (the catalog is near-static). Pass [force] (e.g. from an explicit
+  /// pull-to-refresh) to bypass the throttle and always sync.
+  Future<void> syncExercises({bool force = false});
 
   /// Returns all muscle groups from the local cache.
   Future<List<MuscleGroup>> getMuscleGroups();
