@@ -9,7 +9,7 @@ part 'exercise_api_client.g.dart';
 abstract class ExerciseApiClient {
   factory ExerciseApiClient(Dio dio) = _ExerciseApiClient;
 
-  @GET('/api/v1/exercises')
+  @GET('/exercises')
   Future<ExerciseListEnvelopeDto> listExercises({
     @Query('search') String? search,
     @Query('exercise_type') String? exerciseType,
@@ -18,17 +18,17 @@ abstract class ExerciseApiClient {
     @Query('limit') int? limit,
   });
 
-  @GET('/api/v1/exercises/{id}')
+  @GET('/exercises/{id}')
   Future<ExerciseDetailEnvelopeDto> getExercise(@Path('id') String id);
 
-  @POST('/api/v1/exercises')
+  @POST('/exercises')
   Future<ExerciseDetailEnvelopeDto> createExercise(
     @Body() CreateExerciseRequestDto body,
   );
 
-  @DELETE('/api/v1/exercises/{id}')
+  @DELETE('/exercises/{id}')
   Future<void> deleteExercise(@Path('id') String id);
 
-  @GET('/api/v1/muscle-groups')
+  @GET('/muscle-groups')
   Future<MuscleGroupListEnvelopeDto> getMuscleGroups();
 }

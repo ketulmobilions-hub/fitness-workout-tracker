@@ -9,24 +9,24 @@ part 'competition_api_client.g.dart';
 abstract class CompetitionApiClient {
   factory CompetitionApiClient(Dio dio) = _CompetitionApiClient;
 
-  @GET('/api/v1/competitions')
+  @GET('/competitions')
   Future<CompetitionListEnvelopeDto> listCompetitions();
 
-  @POST('/api/v1/competitions')
+  @POST('/competitions')
   Future<CompetitionEnvelopeDto> createCompetition(
     @Body() Map<String, dynamic> body,
   );
 
-  @GET('/api/v1/competitions/{id}')
+  @GET('/competitions/{id}')
   Future<CompetitionEnvelopeDto> getCompetition(@Path('id') String id);
 
-  @PATCH('/api/v1/competitions/{id}')
+  @PATCH('/competitions/{id}')
   Future<CompetitionUpdateEnvelopeDto> updateCompetition(
     @Path('id') String id,
     @Body() Map<String, dynamic> body,
   );
 
-  @POST('/api/v1/competitions/{id}/attempts')
+  @POST('/competitions/{id}/attempts')
   Future<CompetitionAttemptEnvelopeDto> logAttempt(
     @Path('id') String id,
     @Body() Map<String, dynamic> body,

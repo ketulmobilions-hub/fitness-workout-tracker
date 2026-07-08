@@ -9,10 +9,10 @@ part 'streak_api_client.g.dart';
 abstract class StreakApiClient {
   factory StreakApiClient(Dio dio) = _StreakApiClient;
 
-  @GET('/api/v1/streaks')
+  @GET('/streaks')
   Future<StreakEnvelopeDto> getStreak();
 
-  @GET('/api/v1/streaks/history')
+  @GET('/streaks/history')
   Future<StreakHistoryEnvelopeDto> getStreakHistory({
     @Query('year') required int year,
     @Query('month') required int month,

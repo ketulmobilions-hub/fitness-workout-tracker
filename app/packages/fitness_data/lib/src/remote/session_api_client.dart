@@ -15,7 +15,7 @@ abstract class SessionApiClient {
   // Session lifecycle
   // -------------------------------------------------------------------------
 
-  @GET('/api/v1/sessions')
+  @GET('/sessions')
   Future<SessionListEnvelopeDto> listSessions({
     @Query('status') String? status,
     @Query('cursor') String? cursor,
@@ -24,20 +24,20 @@ abstract class SessionApiClient {
     @Query('to') String? to,
   });
 
-  @POST('/api/v1/sessions')
+  @POST('/sessions')
   Future<StartSessionEnvelopeDto> startSession(
       @Body() StartSessionRequestDto body);
 
-  @GET('/api/v1/sessions/{id}')
+  @GET('/sessions/{id}')
   Future<SessionDetailEnvelopeDto> getSession(@Path('id') String id);
 
-  @PATCH('/api/v1/sessions/{id}')
+  @PATCH('/sessions/{id}')
   Future<SessionDetailEnvelopeDto> updateSession(
     @Path('id') String id,
     @Body() UpdateSessionRequestDto body,
   );
 
-  @POST('/api/v1/sessions/{id}/complete')
+  @POST('/sessions/{id}/complete')
   Future<CompleteSessionEnvelopeDto> completeSession(
     @Path('id') String id,
     @Body() CompleteSessionRequestDto body,
@@ -47,13 +47,13 @@ abstract class SessionApiClient {
   // Set logging
   // -------------------------------------------------------------------------
 
-  @POST('/api/v1/sessions/{id}/sets')
+  @POST('/sessions/{id}/sets')
   Future<LogSetEnvelopeDto> logSet(
     @Path('id') String sessionId,
     @Body() LogSetRequestDto body,
   );
 
-  @DELETE('/api/v1/sessions/{id}/sets/{setId}')
+  @DELETE('/sessions/{id}/sets/{setId}')
   Future<void> deleteSet(
     @Path('id') String sessionId,
     @Path('setId') String setId,
@@ -63,7 +63,7 @@ abstract class SessionApiClient {
   // RPE-to-weight suggestion
   // -------------------------------------------------------------------------
 
-  @GET('/api/v1/sessions/suggest-weight')
+  @GET('/sessions/suggest-weight')
   Future<RpeSuggestionEnvelopeDto> suggestWeight({
     @Query('exerciseId') required String exerciseId,
     @Query('targetRpe') required double targetRpe,

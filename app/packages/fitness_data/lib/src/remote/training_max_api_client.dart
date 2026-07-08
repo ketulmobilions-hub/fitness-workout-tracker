@@ -9,10 +9,10 @@ part 'training_max_api_client.g.dart';
 abstract class TrainingMaxApiClient {
   factory TrainingMaxApiClient(Dio dio) = _TrainingMaxApiClient;
 
-  @GET('/api/v1/training-maxes')
+  @GET('/training-maxes')
   Future<TrainingMaxListEnvelopeDto> getTrainingMaxes();
 
-  @PUT('/api/v1/training-maxes/{exerciseId}')
+  @PUT('/training-maxes/{exerciseId}')
   Future<TrainingMaxEnvelopeDto> upsertTrainingMax(
     @Path('exerciseId') String exerciseId,
     @Body() Map<String, dynamic> body,
