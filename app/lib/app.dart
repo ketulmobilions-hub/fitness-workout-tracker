@@ -43,8 +43,7 @@ class IronLogApp extends ConsumerWidget {
                     ? child!
                     : MediaQuery(
                         data: MediaQuery.of(ctx).copyWith(
-                          padding:
-                              MediaQuery.of(ctx).padding.copyWith(top: 0),
+                          padding: MediaQuery.of(ctx).padding.copyWith(top: 0),
                         ),
                         child: child!,
                       ),
