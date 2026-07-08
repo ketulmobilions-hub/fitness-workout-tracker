@@ -6,7 +6,7 @@ import '../converters/json_string_converter.dart';
 @DataClassName('UserRow')
 class Users extends Table {
   TextColumn get id => text()();
-  TextColumn get email => text().unique()();
+  TextColumn get email => text().nullable().unique()();
   TextColumn get passwordHash => text().nullable()();
   TextColumn get displayName => text().nullable()();
   TextColumn get avatarUrl => text().nullable()();

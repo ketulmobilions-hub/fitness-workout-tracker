@@ -195,9 +195,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required AuthProvider provider,
     required bool isGuest,
   }) async {
-    // Guests have no email from the server; use a stable placeholder so the
-    // non-nullable unique Drift column constraint is satisfied.
-    final effectiveEmail = dto.email ?? 'guest:${dto.id}';
+    // Guests have no email from the server; the Drift email column is
+    // nullable, so store null rather than a placeholder.
 
     // Apple only sends givenName/familyName on the first sign-in. On every
     // subsequent sign-in the server returns null for displayName. To avoid
@@ -216,7 +215,7 @@ class AuthRepositoryImpl implements AuthRepository {
     await _userDao.upsertUser(
       UsersCompanion.insert(
         id: dto.id,
-        email: effectiveEmail,
+        email: Value(dto.email),
         displayName: Value(displayName),
         authProvider: provider,
         isGuest: Value(isGuest),
