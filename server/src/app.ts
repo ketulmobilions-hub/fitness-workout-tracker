@@ -17,10 +17,22 @@ app.set('trust proxy', 1);
 app.use(requestLogger);
 app.use(globalLimiter);
 app.use(helmet());
+
+// CORS allowlist: explicit CORS_ORIGINS, or just the frontend origin by default.
+// Requests with no Origin header (curl, server-to-server, same-origin) are allowed.
+const corsOrigins =
+  env.CORS_ORIGIN?.split(',')
+    .map(o => o.trim())
+    .filter(Boolean) ?? [];
+const allowedOrigins = corsOrigins.length > 0 ? corsOrigins : [env.FRONTEND_URL];
 app.use(
   cors({
-    origin: env.CORS_ORIGIN ?? '*',
-  }),
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
 );
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
