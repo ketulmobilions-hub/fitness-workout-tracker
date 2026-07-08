@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../shared/widgets/app_error_banner.dart';
 import '../../profile/providers/profile_providers.dart';
 import '../providers/onboarding_notifier.dart';
 
@@ -160,7 +162,7 @@ class _NavBar extends StatelessWidget {
   final bool isLastPage;
   final bool nextEnabled;
   final bool isSubmitting;
-  final String? error;
+  final AppException? error;
   final VoidCallback onBack;
   final VoidCallback onSkip;
   final VoidCallback onNext;
@@ -168,18 +170,13 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (error != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-            child: Text(
-              error!,
-              style: TextStyle(color: cs.error, fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
+            child: AppErrorBanner(error: error),
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

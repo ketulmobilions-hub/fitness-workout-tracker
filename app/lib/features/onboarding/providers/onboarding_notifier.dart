@@ -1,6 +1,8 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/errors/app_exception.dart';
+import '../../../core/errors/app_exception_mapper.dart';
 import '../../../features/profile/providers/profile_providers.dart';
 import 'first_launch_provider.dart';
 
@@ -49,7 +51,7 @@ abstract class OnboardingDraft with _$OnboardingDraft {
     double? benchKg,
     double? deadliftKg,
     @Default(false) bool isSubmitting,
-    String? error,
+    AppException? error,
   }) = _OnboardingDraft;
 }
 
@@ -105,9 +107,7 @@ class OnboardingNotifier extends _$OnboardingNotifier {
       await ref.read(onboardingCompleteProvider.notifier).markComplete();
       return true;
     } catch (e) {
-      state = state.copyWith(
-        error: e.toString().replaceAll('Exception: ', ''),
-      );
+      state = state.copyWith(error: mapToAppException(e));
       return false;
     } finally {
       state = state.copyWith(isSubmitting: false);

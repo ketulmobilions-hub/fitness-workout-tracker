@@ -24,6 +24,8 @@ class AuthErrorBanner extends StatelessWidget {
         message ?? 'Something went wrong on our end. Please try again.',
       ValidationException() =>
         'Please fix the errors above and try again.',
+      DatabaseException() =>
+        "Couldn't save on this device. Please try again.",
       CancelledException() => null,
       UnknownException(:final message) =>
         message ?? 'Something went wrong. Please try again.',
