@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_routes.dart';
+import '../../../../shared/widgets/guest_feature_gate.dart';
+import '../../../auth/providers/auth_notifier.dart';
+import '../../../auth/providers/auth_state.dart';
 import '../../providers/exercise_list_provider.dart';
 import '../widgets/exercise_card.dart';
 import '../widgets/exercise_filter_bar.dart';
@@ -13,6 +16,10 @@ class ExerciseListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final exercisesAsync = ref.watch(exerciseListProvider);
+    // Browsing is open to guests, but creating a custom exercise requires a
+    // full account (POST /exercises → 403). Prompt on tap rather than letting
+    // them fill the form and fail on save.
+    final isGuest = ref.watch(authProvider) is AuthGuest;
 
     return Scaffold(
       appBar: AppBar(
@@ -20,7 +27,14 @@ class ExerciseListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         tooltip: 'Create custom exercise',
-        onPressed: () => context.push(AppRoutes.createExercise),
+        onPressed: () => isGuest
+            ? showGuestUpgradePrompt(
+                context,
+                title: 'Custom exercises need an account',
+                message:
+                    'Create a free account to add your own custom exercises.',
+              )
+            : context.push(AppRoutes.createExercise),
         child: const Icon(Icons.add),
       ),
       body: Column(
